@@ -727,11 +727,14 @@ select.form-input { cursor: pointer; }
   </div>
 </div>
 
-<!-- FAB GROUP -->
-<div class="fab-group" id="fabGroup" style="display:flex">
-  <button class="fab fab-secondary" onclick="openQuickCreate()" title="Create Issue & Log Time">✦</button>
-  <button class="fab" onclick="openQuickLog()" title="Quick Log Time">⏱</button>
-</div>
+
+<!-- AI CHAT BUTTON (always visible) -->
+<button onclick="openAiChat()" id="aiFab" title="AI Assistant" style="position:fixed;bottom:18px;right:18px;width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,var(--green),var(--blue));color:#fff;border:none;cursor:pointer;box-shadow:0 4px 20px rgba(45,212,191,.35);z-index:88;display:flex;align-items:center;justify-content:center;transition:transform .15s,box-shadow .15s" onmouseenter="this.style.transform='scale(1.1)';this.style.boxShadow='0 6px 24px rgba(45,212,191,.5)'" onmouseleave="this.style.transform='scale(1)';this.style.boxShadow='0 4px 20px rgba(45,212,191,.35)'">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 2L9.5 9.5 2 12l7.5 2.5L12 22l2.5-7.5L22 12l-7.5-2.5z"/>
+    <path d="M5 5l1.5 1.5M18.5 5L17 6.5M5 19l1.5-1.5M18.5 19L17 17.5" stroke-width="1.2" opacity=".6"/>
+  </svg>
+</button>
 
 <!-- QUICK CREATE MODAL -->
 <div class="modal-overlay" id="quickCreateModal">
@@ -755,13 +758,16 @@ select.form-input { cursor: pointer; }
     </div>
 
     <div class="form-group">
-      <label class="form-label">Issue Title <span class="req">*</span></label>
-      <input type="text" class="form-input" id="qcTitle" placeholder="What needs to be done?">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <label class="form-label" style="margin:0">Issue Title <span class="req">*</span></label>
+        <button id="aiGenBtn" class="btn btn-ghost btn-sm" onclick="aiGenerateIssue()" style="font-size:11px;gap:4px;color:var(--purple)">✦ AI Generate</button>
+      </div>
+      <input type="text" class="form-input" id="qcTitle" placeholder="Brief idea or keywords… AI will expand it">
     </div>
 
     <div class="form-group">
       <label class="form-label">Description <span style="color:var(--text3);font-weight:400">(optional)</span></label>
-      <textarea class="form-input" id="qcDesc" rows="2" placeholder="Steps, context, links…"></textarea>
+      <textarea class="form-input" id="qcDesc" rows="3" placeholder="Steps, context, links…"></textarea>
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
@@ -930,6 +936,22 @@ select.form-input { cursor: pointer; }
   </div>
 </div>
 
+<!-- AI CHAT MODAL -->
+<div class="modal-overlay" id="aiChatModal">
+  <div class="modal" style="max-width:520px;height:560px;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+      <div class="modal-title" style="margin:0">✦ AI Assistant</div>
+      <button onclick="closeModal('aiChatModal')" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text3)">✕</button>
+    </div>
+    <div class="modal-sub" style="margin-bottom:12px">Ask anything about your issues or GitLab workflow</div>
+    <div id="aiChatMessages" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:4px 0;margin-bottom:12px"></div>
+    <div style="display:flex;gap:8px">
+      <input type="text" class="form-input" id="aiChatInput" placeholder="Type a message…" style="flex:1;margin:0" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();aiChatSend();}">
+      <button class="btn btn-primary" onclick="aiChatSend()" id="aiSendBtn" style="flex-shrink:0">Send</button>
+    </div>
+  </div>
+</div>
+
 <!-- SETTINGS MODAL -->
 <div class="modal-overlay" id="settingsModal">
   <div class="modal" style="max-width:480px">
@@ -977,6 +999,20 @@ select.form-input { cursor: pointer; }
       </div>
     </div>
     <div style="font-size:11px;color:var(--text3);margin-top:10px">Friday is always OFF. Checked Saturdays = OFF day. Unchecked = working day.</div>
+
+    <div style="height:1px;background:var(--border);margin:20px 0"></div>
+    <div class="form-group" style="margin:0">
+      <label class="form-label">✦ Gemini API Key <span style="font-size:11px;color:var(--text3);font-weight:400">(optional — for AI features)</span></label>
+      <input type="password" class="form-input" id="cfgGeminiKey" placeholder="AIza...">
+      <div style="font-size:11px;color:var(--text3);margin-top:6px">Get a free key from <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--blue)">Google AI Studio</a></div>
+    </div>
+    <div class="form-group" style="margin:10px 0 0">
+      <label class="form-label">Gemini Model</label>
+      <select class="form-input" id="cfgGeminiModel">
+        <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite (faster, cheaper)</option>
+        <option value="gemini-2.5-flash">gemini-2.5-flash (smarter)</option>
+      </select>
+    </div>
 
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('settingsModal')">Cancel</button>
@@ -2152,7 +2188,6 @@ function showPage(name, pushUrl = true) {
   if (name === 'log')       { updateLabels(); loadMonthlyLogIfNeeded(); }
   if (name === 'issues')    loadMyIssues();
   if (name === 'dashboard') loadDashboard();
-  document.getElementById('fabGroup').style.display = name === 'dashboard' ? 'flex' : 'none';
   if (name === 'create')    initCreatePage();
 }
 window.addEventListener('popstate', e => {
@@ -2188,6 +2223,89 @@ document.addEventListener('click', () => {
   }
 });
 
+// ── AI (GEMINI) ──
+async function geminiCall(prompt) {
+  const key = CFG.gemini_key;
+  if (!key) { toast('Add Gemini API key in Settings (S)', true); return null; }
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${CFG.gemini_model||'gemini-2.5-flash-lite'}:generateContent?key=${key}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+  });
+  if (!res.ok) { const e = await res.json(); throw new Error(e.error?.message || res.statusText); }
+  const data = await res.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+}
+
+async function aiGenerateIssue() {
+  const hint = document.getElementById('qcTitle').value.trim();
+  if (!hint) return toast('Type a brief idea first, then click AI Generate', true);
+  const btn = document.getElementById('aiGenBtn');
+  btn.textContent = '✦ Generating…'; btn.disabled = true;
+  try {
+    const result = await geminiCall(
+      `You are a software project manager. Based on this brief idea, generate a clear issue title and a short description (2-4 sentences max).\n\nIdea: "${hint}"\n\nRespond in this exact JSON format:\n{"title":"...","description":"..."}`
+    );
+    const json = JSON.parse(result.match(/\{[\s\S]*\}/)[0]);
+    document.getElementById('qcTitle').value = json.title || hint;
+    document.getElementById('qcDesc').value  = json.description || '';
+  } catch(e) { toast('AI error: ' + e.message, true); }
+  btn.textContent = '✦ AI Generate'; btn.disabled = false;
+}
+
+// AI Chat state
+let _aiHistory = [];
+
+function openAiChat() {
+  if (!CFG.gemini_key) {
+    toast('Add Gemini API key in Settings (S) first', true);
+    openSettings();
+    return;
+  }
+  document.getElementById('aiChatModal').classList.add('open');
+  if (_aiHistory.length === 0) {
+    appendAiMsg('assistant', 'Hi! I\'m your AI assistant. Ask me anything about your GitLab issues or workflow. I can also help you draft issue descriptions.');
+  }
+  setTimeout(() => document.getElementById('aiChatInput').focus(), 100);
+}
+
+function appendAiMsg(role, text) {
+  _aiHistory.push({ role, text });
+  const box = document.getElementById('aiChatMessages');
+  const isUser = role === 'user';
+  const div = document.createElement('div');
+  div.style.cssText = `display:flex;justify-content:${isUser?'flex-end':'flex-start'}`;
+  div.innerHTML = `<div style="max-width:80%;padding:10px 14px;border-radius:${isUser?'14px 14px 4px 14px':'14px 14px 14px 4px'};background:${isUser?'var(--blue)':'var(--surface2)'};color:${isUser?'#fff':'var(--text)'};font-size:13px;line-height:1.5;white-space:pre-wrap">${text}</div>`;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+async function aiChatSend() {
+  const input = document.getElementById('aiChatInput');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  appendAiMsg('user', text);
+  const btn = document.getElementById('aiSendBtn');
+  btn.textContent = '…'; btn.disabled = true;
+
+  // Build context about current user's data
+  const context = `You are an AI assistant for a GitLab personal dashboard. The user is ${ME?.name || 'a developer'}.
+Current open issues: ${(allIssues||[]).filter(i=>i.state==='opened').map(i=>`#${i.iid} "${i.title}"`).join(', ') || 'none loaded'}.
+Today: ${new Date().toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}.
+Keep responses concise and helpful.`;
+
+  const history = _aiHistory.slice(-10).map(m => `${m.role==='user'?'User':'Assistant'}: ${m.text}`).join('\n');
+  const prompt = `${context}\n\nConversation:\n${history}\nUser: ${text}\nAssistant:`;
+
+  try {
+    const reply = await geminiCall(prompt);
+    appendAiMsg('assistant', reply);
+  } catch(e) { appendAiMsg('assistant', '⚠️ Error: ' + e.message); }
+  btn.textContent = 'Send'; btn.disabled = false;
+  document.getElementById('aiChatInput').focus();
+}
+
 // ── SETTINGS ──
 function updateSatLabel(n) {
   const checked = document.getElementById('sat'+n+'off').checked;
@@ -2207,8 +2325,10 @@ function openSettings() {
     document.getElementById('sat'+n+'off').checked = off.includes(n);
     updateSatLabel(n);
   });
-  document.getElementById('cfgSatHours').value = CFG.sat_hours ?? 7;
-  document.getElementById('cfgDayHours').value = CFG.day_hours ?? 8;
+  document.getElementById('cfgSatHours').value  = CFG.sat_hours ?? 7;
+  document.getElementById('cfgDayHours').value  = CFG.day_hours ?? 8;
+  document.getElementById('cfgGeminiKey').value   = CFG.gemini_key   || '';
+  document.getElementById('cfgGeminiModel').value = CFG.gemini_model || 'gemini-2.5-flash-lite';
   document.getElementById('settingsModal').classList.add('open');
   setTimeout(() => document.getElementById(CFG.token ? 'cfgUrl' : 'cfgToken').focus(), 100);
 }
@@ -2217,9 +2337,11 @@ async function saveSettings() {
   const token = document.getElementById('cfgToken').value.trim();
   if (!token) return toast('Token is required', true);
   const sat_off   = [1,2,3,4].filter(n => document.getElementById('sat'+n+'off').checked);
-  const sat_hours = parseFloat(document.getElementById('cfgSatHours').value) || 7;
-  const day_hours = parseFloat(document.getElementById('cfgDayHours').value) || 8;
-  saveCfg({ url: url || DEFAULT_URL, token, sat_off, sat_hours, day_hours });
+  const sat_hours  = parseFloat(document.getElementById('cfgSatHours').value) || 7;
+  const day_hours  = parseFloat(document.getElementById('cfgDayHours').value) || 8;
+  const gemini_key   = document.getElementById('cfgGeminiKey').value.trim();
+  const gemini_model = document.getElementById('cfgGeminiModel').value;
+  saveCfg({ url: url || DEFAULT_URL, token, sat_off, sat_hours, day_hours, gemini_key, gemini_model });
   API   = (CFG.url || DEFAULT_URL).replace(/\/$/, '') + '/api/v4';
   TOKEN = CFG.token;
   closeModal('settingsModal');
