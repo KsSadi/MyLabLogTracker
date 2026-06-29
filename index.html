@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>My Lab Dashboard</title>
+<title>My Codelab Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -418,10 +418,10 @@ select.form-input { cursor: pointer; }
 <div class="header">
   <a class="logo" href="#">
     <svg viewBox="0 0 24 24" fill="none"><path d="M12 2L2 9l2 11 8 2 8-2 2-11L12 2z" fill="#e24329"/><path d="M12 2l4 9H8l4-9z" fill="#fc6d26"/><path d="M2 9l6 2-6 9 0-11z" fill="#e24329"/><path d="M22 9l-6 2 6 9 0-11z" fill="#e24329"/><path d="M8 11l4 11-6-9 2-2z" fill="#fc6d26"/><path d="M16 11l-4 11 6-9-2-2z" fill="#fc6d26"/></svg>
-    <span class="logo-text">My<em>Lab</em></span>
+    <span class="logo-text">Web<em>Crafter</em></span>
   </a>
   <div class="header-sep"></div>
-  <span class="header-label">Personal Dashboard</span>
+  <span class="header-label">Codelab Dashboard</span>
   <div class="header-right">
     <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme" id="themeBtn">🌙</button>
     <div class="user-pill" id="userInfo">
@@ -947,23 +947,23 @@ select.form-input { cursor: pointer; }
 
     <div style="height:1px;background:var(--border);margin:20px 0"></div>
 
-    <div class="form-label" style="margin-bottom:12px">Saturday Schedule — select which Saturdays are <span style="color:var(--red)">OFF</span></div>
+    <div class="form-label" style="margin-bottom:12px">Saturday Schedule — check to mark as <span style="color:var(--red)">OFF</span></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-      <label style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-xs);cursor:pointer">
-        <input type="checkbox" id="sat1off" style="width:16px;height:16px;accent-color:var(--red);cursor:pointer">
-        <span style="font-size:13px;font-weight:600">1st Saturday <span style="color:var(--red);font-size:11px">OFF</span></span>
+      <label style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-xs);cursor:pointer" id="satLabel1">
+        <input type="checkbox" id="sat1off" style="width:16px;height:16px;accent-color:var(--red);cursor:pointer" onchange="updateSatLabel(1)">
+        <span style="font-size:13px;font-weight:600">1st Saturday <span id="satBadge1" style="font-size:11px;color:var(--green)">ON</span></span>
       </label>
-      <label style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-xs);cursor:pointer">
-        <input type="checkbox" id="sat2off" style="width:16px;height:16px;accent-color:var(--red);cursor:pointer">
-        <span style="font-size:13px;font-weight:600">2nd Saturday <span style="color:var(--red);font-size:11px">OFF</span></span>
+      <label style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-xs);cursor:pointer" id="satLabel2">
+        <input type="checkbox" id="sat2off" style="width:16px;height:16px;accent-color:var(--red);cursor:pointer" onchange="updateSatLabel(2)">
+        <span style="font-size:13px;font-weight:600">2nd Saturday <span id="satBadge2" style="font-size:11px;color:var(--green)">ON</span></span>
       </label>
-      <label style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-xs);cursor:pointer">
-        <input type="checkbox" id="sat3off" style="width:16px;height:16px;accent-color:var(--red);cursor:pointer">
-        <span style="font-size:13px;font-weight:600">3rd Saturday <span style="color:var(--red);font-size:11px">OFF</span></span>
+      <label style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-xs);cursor:pointer" id="satLabel3">
+        <input type="checkbox" id="sat3off" style="width:16px;height:16px;accent-color:var(--red);cursor:pointer" onchange="updateSatLabel(3)">
+        <span style="font-size:13px;font-weight:600">3rd Saturday <span id="satBadge3" style="font-size:11px;color:var(--green)">ON</span></span>
       </label>
-      <label style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-xs);cursor:pointer">
-        <input type="checkbox" id="sat4off" style="width:16px;height:16px;accent-color:var(--red);cursor:pointer">
-        <span style="font-size:13px;font-weight:600">4th Saturday <span style="color:var(--red);font-size:11px">OFF</span></span>
+      <label style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-xs);cursor:pointer" id="satLabel4">
+        <input type="checkbox" id="sat4off" style="width:16px;height:16px;accent-color:var(--red);cursor:pointer" onchange="updateSatLabel(4)">
+        <span style="font-size:13px;font-weight:600">4th Saturday <span id="satBadge4" style="font-size:11px;color:var(--green)">ON</span></span>
       </label>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px">
@@ -1213,9 +1213,10 @@ async function loadDashboard() {
   const recent = open.slice(0, 8);
   document.getElementById('dashIssues').innerHTML = recent.length ? recent.map(i => {
     const proj = i.references?.full?.split('#')[0] || i.web_url.split('/-/')[0].split('/').slice(-2).join('/');
+    const labels = (i.labels||[]).map(l=>`<span class="chip" style="background:var(--surface3);color:var(--text2);border:1px solid var(--border2);font-size:10px;padding:1px 6px">${l}</span>`).join('');
     return `<div class="dash-issue-row" onclick="window.open('${i.web_url}','_blank')">
       <div class="dash-issue-num">#${i.iid}</div>
-      <div><div class="dash-issue-title">${i.title}</div><div class="dash-issue-proj">${proj}</div></div>
+      <div><div class="dash-issue-title">${i.title}</div><div class="dash-issue-proj" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">${proj}${labels ? '<span style="color:var(--border2)">·</span>'+labels : ''}</div></div>
     </div>`;
   }).join('') : '<div class="empty"><div class="eicon">✕</div><p>No open issues</p></div>';
 
@@ -1412,11 +1413,13 @@ function renderIssues(issues) {
       <div class="ic-top">
         <div class="ic-num">#${issue.iid}</div>
         <div class="ic-body">
-          <div class="ic-title" onclick="window.open('${issue.web_url}','_blank')">${issue.title}</div>
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+            <div class="ic-title" onclick="window.open('${issue.web_url}','_blank')">${issue.title}</div>
+            <span class="chip chip-purple" id="time-chip-${issue.project_id}-${issue.iid}" style="flex-shrink:0">${timeTxt ? '⏱ ' + timeTxt : ''}</span>
+          </div>
           <div class="ic-meta">
-            ${isOpen ? '<span class="chip chip-green">▾ Open</span>' : '<span class="chip chip-gray">✓ Closed</span>'}
             <span class="chip chip-blue">🔍 ${pname}</span>
-            <span class="chip chip-purple" id="time-chip-${issue.project_id}-${issue.iid}">${timeTxt ? '⏱ ' + timeTxt : '⏱ …'}</span>
+            ${(issue.labels||[]).map(l=>`<span class="chip" style="background:var(--surface3);color:var(--text2);border:1px solid var(--border2)">${l}</span>`).join('')}
           </div>
         </div>
       </div>
@@ -2186,11 +2189,24 @@ document.addEventListener('click', () => {
 });
 
 // ── SETTINGS ──
+function updateSatLabel(n) {
+  const checked = document.getElementById('sat'+n+'off').checked;
+  const badge = document.getElementById('satBadge'+n);
+  const label = document.getElementById('satLabel'+n);
+  badge.textContent = checked ? 'OFF' : 'ON';
+  badge.style.color = checked ? 'var(--red)' : 'var(--green)';
+  label.style.borderColor = checked ? 'var(--red)' : 'var(--border2)';
+  label.style.background  = checked ? 'rgba(239,68,68,.06)' : 'var(--surface2)';
+}
+
 function openSettings() {
   document.getElementById('cfgUrl').value   = CFG.url   || DEFAULT_URL;
   document.getElementById('cfgToken').value = CFG.token || '';
   const off = getSatOff();
-  [1,2,3,4].forEach(n => { document.getElementById('sat'+n+'off').checked = off.includes(n); });
+  [1,2,3,4].forEach(n => {
+    document.getElementById('sat'+n+'off').checked = off.includes(n);
+    updateSatLabel(n);
+  });
   document.getElementById('cfgSatHours').value = CFG.sat_hours ?? 7;
   document.getElementById('cfgDayHours').value = CFG.day_hours ?? 8;
   document.getElementById('settingsModal').classList.add('open');
@@ -2201,8 +2217,8 @@ async function saveSettings() {
   const token = document.getElementById('cfgToken').value.trim();
   if (!token) return toast('Token is required', true);
   const sat_off   = [1,2,3,4].filter(n => document.getElementById('sat'+n+'off').checked);
-  const sat_hours = parseInt(document.getElementById('cfgSatHours').value) || 7;
-  const day_hours = parseInt(document.getElementById('cfgDayHours').value) || 8;
+  const sat_hours = parseFloat(document.getElementById('cfgSatHours').value) || 7;
+  const day_hours = parseFloat(document.getElementById('cfgDayHours').value) || 8;
   saveCfg({ url: url || DEFAULT_URL, token, sat_off, sat_hours, day_hours });
   API   = (CFG.url || DEFAULT_URL).replace(/\/$/, '') + '/api/v4';
   TOKEN = CFG.token;
@@ -2210,7 +2226,8 @@ async function saveSettings() {
   cacheClear();
   ME = null; allIssues = []; allProjects = [];
   document.getElementById('userInfo').innerHTML = '<span class="user-pill-name">Connecting…</span>';
-  await connect();
+  const curPage = URL_PAGES[location.pathname] || 'dashboard';
+  await connect(curPage);
   startAutoRefresh();
 }
 
@@ -2222,7 +2239,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'l' || e.key === 'L') openQuickLog();
   if (e.key === 's' || e.key === 'S') openSettings();
 });
-const REFRESH_INTERVAL = 30 * 1000; // 30 seconds
+const REFRESH_INTERVAL = 3 * 60 * 1000; // 3 minutes
 let _refreshTimer = null;
 let _ringTimer = null;
 
@@ -2265,9 +2282,6 @@ function startAutoRefresh() {
     cacheClear();
     try {
       await Promise.all([loadMyIssues(), loadDashboard()]);
-      const cur = URL_PAGES[location.pathname] || 'dashboard';
-      if (cur === 'log')  loadMonthlyLog();
-      if (cur === 'time') loadTimeReport();
     } catch {
       // refresh failed (e.g. bad token) — keep the ring cycling anyway
     }
