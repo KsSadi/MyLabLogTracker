@@ -1,0 +1,2151 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Lab Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ── THEMES ── */
+[data-theme="dark"] {
+  --bg:       #07100f;
+  --surface:  #0b1916;
+  --surface2: #102018;
+  --surface3: #152820;
+  --border:   #1a3028;
+  --border2:  #1f3d32;
+  --text:     #d8f0ea;
+  --text2:    #7ab5a4;
+  --text3:    #3d7060;
+  --blue:     #2dd4bf;
+  --blue-bg:  rgba(45,212,191,.12);
+  --green:    #34d399;
+  --green-bg: rgba(52,211,153,.12);
+  --red:      #f87171;
+  --red-bg:   rgba(248,113,113,.12);
+  --purple:   #5eead4;
+  --purple-bg:rgba(94,234,212,.12);
+  --yellow:   #fbbf24;
+  --shadow:   0 4px 24px rgba(0,0,0,.5);
+  --shadow-lg:0 8px 40px rgba(0,0,0,.7);
+}
+[data-theme="light"] {
+  --bg:       #f0faf8;
+  --surface:  #ffffff;
+  --surface2: #f0faf8;
+  --surface3: #e0f5f0;
+  --border:   #b2ddd6;
+  --border2:  #8fccc3;
+  --text:     #0a1f1c;
+  --text2:    #2e6b61;
+  --text3:    #6aada3;
+  --blue:     #0d9488;
+  --blue-bg:  rgba(13,148,136,.10);
+  --green:    #059669;
+  --green-bg: rgba(5,150,105,.10);
+  --red:      #dc2626;
+  --red-bg:   rgba(220,38,38,.08);
+  --purple:   #0f766e;
+  --purple-bg:rgba(15,118,110,.10);
+  --yellow:   #d97706;
+  --shadow:   0 2px 12px rgba(0,0,0,.06);
+  --shadow-lg:0 8px 32px rgba(0,0,0,.12);
+}
+
+:root {
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-xs: 5px;
+  --sidebar-w: 220px;
+  --header-h: 60px;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-size: 14px;
+  line-height: 1.6;
+  transition: background .2s, color .2s;
+}
+
+/* ── HEADER ── */
+.header {
+  position: sticky; top: 0; z-index: 100;
+  height: var(--header-h);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  display: flex; align-items: center; gap: 16px;
+  box-shadow: var(--shadow);
+}
+.logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.logo svg { width: 28px; height: 28px; flex-shrink: 0; }
+.logo-text { font-size: 17px; font-weight: 800; color: var(--text); letter-spacing: -.5px; }
+.logo-text em { color: var(--blue); font-style: normal; }
+.header-sep { width: 1px; height: 22px; background: var(--border); }
+.header-label { font-size: 13px; font-weight: 500; color: var(--text3); }
+
+.header-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+
+.theme-toggle {
+  width: 36px; height: 36px; border-radius: 50%;
+  border: 1px solid var(--border2);
+  background: var(--surface2);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  font-size: 16px; transition: all .15s; color: var(--text2);
+}
+.theme-toggle:hover { background: var(--surface3); color: var(--text); }
+
+.user-pill {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 24px; padding: 5px 14px 5px 5px;
+}
+.user-pill img { width: 26px; height: 26px; border-radius: 50%; }
+.user-pill-name { font-size: 13px; font-weight: 600; color: var(--text2); }
+.online-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); }
+
+/* ── LAYOUT ── */
+.config-bar { display: none; }
+.shell { display: flex; height: calc(100vh - var(--header-h)); }
+
+/* ── SIDEBAR ── */
+.sidebar {
+  width: var(--sidebar-w); flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: 16px 10px 24px;
+  display: flex; flex-direction: column; gap: 2px;
+  overflow-y: auto;
+}
+.nav-group { font-size: 10px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: 1.2px; padding: 16px 12px 6px; }
+.nav-group:first-child { padding-top: 4px; }
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: var(--radius-sm);
+  cursor: pointer; color: var(--text2);
+  font-size: 14px; font-weight: 500;
+  transition: all .15s; position: relative;
+  user-select: none;
+}
+.nav-item:hover { color: var(--text); background: var(--surface2); }
+.nav-item.active { color: var(--blue); background: var(--blue-bg); font-weight: 600; }
+.nav-item.active::before {
+  content: ''; position: absolute; left: 0; top: 8px; bottom: 8px;
+  width: 3px; background: var(--blue); border-radius: 0 3px 3px 0;
+}
+.nav-icon { font-size: 16px; width: 20px; text-align: center; flex-shrink: 0; }
+.nav-badge { margin-left: auto; background: var(--red); color: #fff; border-radius: 12px; padding: 1px 7px; font-size: 11px; font-weight: 700; }
+
+/* ── CONTENT ── */
+.content { flex: 1; overflow-y: auto; padding: 28px 32px; }
+.content::-webkit-scrollbar { width: 5px; }
+.content::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+.page { display: none; }
+.page.active { display: block; animation: fadeUp .18s ease; }
+@keyframes fadeUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+
+/* ── PAGE HEADER ── */
+.page-hd { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; flex-wrap: wrap; }
+.page-hd h2 { font-size: 22px; font-weight: 800; letter-spacing: -.5px; }
+.page-hd .month-tag { font-size: 13px; font-weight: 500; color: var(--text3); background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 3px 12px; }
+.page-hd-right { margin-left: auto; display: flex; gap: 8px; }
+
+/* ── BUTTONS ── */
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: var(--radius-xs); border: none; cursor: pointer; font-size: 13px; font-weight: 600; transition: all .15s; font-family: inherit; }
+.btn-primary { background: var(--blue); color: #fff; }
+.btn-primary:hover { filter: brightness(1.1); box-shadow: 0 0 20px rgba(45,212,191,.3); }
+.btn-danger { background: var(--red); color: #fff; }
+.btn-danger:hover { filter: brightness(1.1); }
+.btn-ghost { background: transparent; color: var(--text2); border: 1px solid var(--border2); }
+.btn-ghost:hover { color: var(--text); background: var(--surface2); border-color: var(--text3); }
+.btn-sm { padding: 5px 12px; font-size: 12px; }
+
+/* ── DASHBOARD PAGE ── */
+.dash-welcome { margin-bottom: 28px; }
+.dash-welcome h1 { font-size: 26px; font-weight: 800; letter-spacing: -.6px; margin-bottom: 4px; }
+.dash-welcome p { font-size: 14px; color: var(--text2); }
+
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin-bottom: 28px; }
+.kpi {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 22px 20px;
+  position: relative; overflow: hidden; transition: transform .15s, box-shadow .15s;
+}
+.kpi:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+.kpi-accent { position: absolute; top: 0; left: 0; right: 0; height: 3px; border-radius: var(--radius) var(--radius) 0 0; }
+.kpi-label { font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 10px; }
+.kpi-value { font-size: 34px; font-weight: 800; letter-spacing: -1.5px; line-height: 1; }
+.kpi-sub { font-size: 12px; color: var(--text3); margin-top: 6px; }
+
+.dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.dash-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.dash-card-hd { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px 12px; border-bottom: 1px solid var(--border); }
+.dash-card-hd h3 { font-size: 14px; font-weight: 700; }
+.dash-card-body { padding: 8px 0; max-height: 340px; overflow-y: auto; }
+.dash-card-body::-webkit-scrollbar { width: 4px; }
+.dash-card-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+.dash-issue-row { display: flex; align-items: flex-start; gap: 10px; padding: 10px 20px; border-bottom: 1px solid var(--border); transition: background .1s; cursor: pointer; }
+.dash-issue-row:last-child { border-bottom: none; }
+.dash-issue-row:hover { background: var(--surface2); }
+.dash-issue-num { font-size: 11px; font-weight: 700; color: var(--text3); font-family: monospace; flex-shrink: 0; margin-top: 2px; }
+.dash-issue-title { font-size: 13px; font-weight: 500; color: var(--text); flex: 1; }
+.dash-issue-proj { font-size: 11px; color: var(--text3); margin-top: 2px; }
+
+.day-row { display: flex; align-items: center; gap: 12px; padding: 10px 20px; border-bottom: 1px solid var(--border); }
+.day-row:last-child { border-bottom: none; }
+.day-date { font-size: 12px; font-weight: 700; color: var(--text2); width: 80px; flex-shrink: 0; }
+.day-bar-wrap { flex: 1; height: 6px; background: var(--surface3); border-radius: 3px; overflow: hidden; }
+.day-bar { height: 100%; background: var(--blue); border-radius: 3px; transition: width .4s ease; }
+.day-hours { font-size: 12px; font-weight: 700; color: var(--purple); width: 44px; text-align: right; flex-shrink: 0; }
+.day-missing { font-size: 11px; color: var(--red); font-style: italic; }
+
+/* ── FILTER ROW ── */
+.filter-row { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+.filter-input {
+  background: var(--surface); border: 1px solid var(--border2);
+  color: var(--text); padding: 8px 14px; border-radius: var(--radius-xs);
+  font-size: 14px; font-family: inherit; outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+.filter-input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-bg); }
+.filter-input.wide { flex: 1; min-width: 200px; }
+select.filter-input { cursor: pointer; }
+
+/* ── ISSUE CARDS ── */
+.issue-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 18px 20px; margin-bottom: 10px;
+  transition: border-color .15s, transform .1s, box-shadow .15s;
+}
+.issue-card:hover { border-color: var(--border2); transform: translateY(-1px); box-shadow: var(--shadow); }
+.ic-top { display: flex; align-items: flex-start; gap: 12px; }
+.ic-num { font-size: 12px; font-weight: 700; color: var(--text3); font-family: monospace; flex-shrink: 0; margin-top: 3px; }
+.ic-body { flex: 1; min-width: 0; }
+.ic-title { font-size: 15px; font-weight: 600; color: var(--text); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ic-title:hover { color: var(--blue); }
+.ic-meta { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+.chip-green { background: var(--green-bg); color: var(--green); }
+.chip-blue  { background: var(--blue-bg);  color: var(--blue); }
+.chip-purple{ background: var(--purple-bg);color: var(--purple); }
+.chip-red   { background: var(--red-bg);   color: var(--red); }
+.chip-gray  { background: var(--surface2); color: var(--text3); border: 1px solid var(--border); }
+.ic-actions { display: flex; gap: 6px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+
+/* ── FORM ── */
+.form-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 28px; max-width: 600px; }
+.form-group { margin-bottom: 18px; }
+.form-label { font-size: 13px; font-weight: 600; color: var(--text2); display: block; margin-bottom: 7px; }
+.form-input {
+  width: 100%; background: var(--surface2); border: 1px solid var(--border2);
+  color: var(--text); padding: 10px 14px; border-radius: var(--radius-xs);
+  font-size: 14px; font-family: inherit; outline: none; transition: all .15s;
+}
+.form-input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-bg); background: var(--surface); }
+textarea.form-input { resize: vertical; min-height: 90px; }
+select.form-input { cursor: pointer; }
+.form-divider { height: 1px; background: var(--border); margin: 20px 0; }
+.req { color: var(--red); }
+.date-warn { color:var(--yellow); font-size:11px; font-weight:500; }
+
+/* ── NEW LOG ENTRY PAGE ── */
+.nle-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+@media (max-width: 860px) { .nle-layout { grid-template-columns: 1fr; } }
+.nle-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; }
+.nle-card-hd { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+.nle-card-icon { font-size: 20px; }
+.nle-card-title { font-size: 15px; font-weight: 700; color: var(--text); flex: 1; }
+.nle-card-sub { font-size: 11px; color: var(--text3); font-weight: 500; }
+.assignee-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: var(--surface2); border: 1px solid var(--border2); border-radius: var(--radius-xs); }
+.assignee-me { display: flex; align-items: center; gap: 10px; flex: 1; }
+.assignee-avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--blue); color: #fff; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+/* time entry rows */
+.time-entry-row { display: grid; grid-template-columns: 120px 130px 1fr 32px; gap: 8px; align-items: center; margin-bottom: 10px; padding: 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-xs); transition: border-color .15s; }
+.time-entry-row:hover { border-color: var(--border2); }
+.time-entry-row input { background: var(--surface); border: 1px solid var(--border2); color: var(--text); padding: 8px 11px; border-radius: 6px; font-size: 13px; font-family: inherit; outline: none; width: 100%; transition: all .15s; }
+.time-entry-row input:focus { border-color: var(--blue); box-shadow: 0 0 0 2px var(--blue-bg); }
+.time-entry-row input[type="date"] { cursor: pointer; }
+.ter-remove { width: 32px; height: 32px; border-radius: 6px; border: 1px solid var(--border2); background: transparent; color: var(--text3); font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .15s; }
+.ter-remove:hover { background: var(--red-bg); border-color: var(--red); color: var(--red); }
+.nle-add-row { width: 100%; padding: 10px; border: 1.5px dashed var(--border2); border-radius: var(--radius-xs); background: transparent; color: var(--blue); font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 4px; transition: all .15s; font-family: inherit; }
+.nle-add-row:hover { background: var(--blue-bg); border-color: var(--blue); }
+.nle-time-summary { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; padding: 12px 16px; background: var(--blue-bg); border: 1px solid var(--blue); border-radius: var(--radius-xs); }
+.nle-footer { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 20px 0 8px; }
+.nle-footer .btn { height: 44px; padding: 0 24px; font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-width: 140px; }
+/* bulk entry */
+/* bulk entry */
+.bulk-card { background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius-xs); margin-bottom:10px; overflow:hidden; transition:border-color .15s; }
+.bulk-card:hover { border-color:var(--border2); }
+.bulk-card-head { display:grid; grid-template-columns:28px 1fr auto auto; gap:10px; align-items:center; padding:12px 14px; cursor:default; }
+.bulk-row-num { width:24px; height:24px; border-radius:50%; background:var(--blue-bg); color:var(--blue); font-size:11px; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.bulk-card-body { padding:0 14px 14px; display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.bulk-card-body .form-group { margin:0; }
+.bulk-card-body textarea { resize:vertical; min-height:60px; }
+.bulk-card-foot { display:flex; align-items:center; gap:16px; padding:10px 14px; border-top:1px solid var(--border); background:var(--surface); flex-wrap:wrap; }
+.bulk-check-item { display:flex; align-items:center; gap:7px; font-size:13px; font-weight:600; color:var(--text2); cursor:pointer; }
+.bulk-check-item input { width:15px; height:15px; cursor:pointer; }
+.bulk-remove-btn { margin-left:auto; padding:4px 10px; font-size:12px; font-weight:600; border-radius:6px; border:1px solid var(--border2); background:transparent; color:var(--text3); cursor:pointer; font-family:inherit; transition:all .15s; }
+.bulk-remove-btn:hover { background:var(--red-bg); border-color:var(--red); color:var(--red); }
+.bulk-status { display:inline-block; font-size:11px; font-weight:700; padding:2px 8px; border-radius:20px; }
+.bulk-status.ok { background:var(--green-bg); color:var(--green); }
+.bulk-status.err { background:var(--red-bg); color:var(--red); }
+/* missing log button */
+.log-missing-btn { padding: 4px 12px; font-size: 12px; font-weight: 600; border-radius: 6px; border: 1px solid var(--blue); background: var(--blue-bg); color: var(--blue); cursor: pointer; font-family: inherit; transition: all .15s; white-space: nowrap; }
+.log-missing-btn:hover { background: var(--blue); color: #fff; }
+/* missing log modal tabs */
+.ml-tabs { display: flex; gap: 0; border: 1px solid var(--border2); border-radius: var(--radius-xs); overflow: hidden; margin-top: 14px; }
+.ml-tab { flex: 1; padding: 9px; font-size: 13px; font-weight: 600; border: none; background: var(--surface2); color: var(--text3); cursor: pointer; font-family: inherit; transition: all .15s; }
+.ml-tab.active { background: var(--blue); color: #fff; }
+.nle-close-opt { margin-top: 18px; padding: 12px 14px; background: var(--red-bg); border: 1px solid var(--red); border-radius: var(--radius-xs); }
+.nle-check-row { display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 600; color: var(--red); cursor: pointer; }
+/* ── SEARCHABLE DROPDOWN ── */
+.sd-wrap { position: relative; }
+.sd-display { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--surface2); border: 1px solid var(--border2); border-radius: var(--radius-xs); cursor: pointer; font-size: 14px; transition: all .15s; user-select: none; }
+.sd-display:hover, .sd-wrap.open .sd-display { border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-bg); background: var(--surface); }
+.sd-placeholder { color: var(--text3); }
+.sd-selected-text { color: var(--text); }
+.sd-arrow { font-size: 11px; color: var(--text3); transition: transform .15s; }
+.sd-wrap.open .sd-arrow { transform: rotate(180deg); }
+.sd-dropdown { display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: var(--surface); border: 1px solid var(--border2); border-radius: var(--radius-xs); box-shadow: 0 8px 24px rgba(0,0,0,.18); z-index: 200; overflow: hidden; }
+.sd-wrap.open .sd-dropdown { display: block; }
+.sd-search-wrap { padding: 8px; border-bottom: 1px solid var(--border); }
+.sd-search { width: 100%; background: var(--surface2); border: 1px solid var(--border2); color: var(--text); padding: 7px 10px; border-radius: 6px; font-size: 13px; font-family: inherit; outline: none; box-sizing: border-box; }
+.sd-search:focus { border-color: var(--blue); }
+.sd-list { max-height: 220px; overflow-y: auto; }
+.sd-opt { padding: 9px 14px; font-size: 13px; cursor: pointer; color: var(--text); transition: background .1s; }
+.sd-opt:hover { background: var(--blue-bg); color: var(--blue); }
+.sd-opt.selected { background: var(--blue-bg); color: var(--blue); font-weight: 600; }
+.sd-opt.hidden { display: none; }
+.sd-empty { padding: 12px 14px; font-size: 13px; color: var(--text3); text-align: center; }
+
+/* ── STATS ── */
+.stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin-bottom: 28px; }
+.stat-box {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 22px 20px; position: relative; overflow: hidden;
+}
+.stat-box::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background: var(--accent-c, var(--blue)); }
+.stat-box.g::before { --accent-c: var(--green); }
+.stat-box.p::before { --accent-c: var(--purple); }
+.stat-box.r::before { --accent-c: var(--red); }
+.stat-label { font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 10px; }
+.stat-value { font-size: 32px; font-weight: 800; letter-spacing: -1px; }
+.stat-sub { font-size: 12px; color: var(--text3); margin-top: 5px; }
+
+/* ── TABLES ── */
+.table-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.dtable { width: 100%; border-collapse: collapse; }
+.dtable th { text-align: left; padding: 11px 16px; font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: .8px; border-bottom: 1px solid var(--border); background: var(--surface2); }
+.dtable td { padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text2); vertical-align: middle; }
+.dtable tbody tr:last-child td { border-bottom: none; }
+.dtable tbody tr:hover td { background: var(--surface2); }
+
+/* ── LOG TABLE ── */
+.log-bar { display: flex; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 20px; }
+.log-bar-item { flex: 1; padding: 18px 22px; border-right: 1px solid var(--border); }
+.log-bar-item:last-child { border-right: none; }
+.log-bar-label { font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 8px; }
+.log-bar-value { font-size: 28px; font-weight: 800; letter-spacing: -1px; }
+
+.ltable { width: 100%; border-collapse: collapse; }
+.ltable th { text-align: left; padding: 10px 16px; font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: .8px; border-bottom: 1px solid var(--border); background: var(--surface2); }
+.ltable td { padding: 11px 16px; border-bottom: 1px solid var(--border); font-size: 14px; vertical-align: middle; }
+.ltable td:nth-child(4) { text-align: right; }
+.ltable th:nth-child(4) { text-align: right; }
+.ltable tbody tr:last-child td { border-bottom: none; }
+.ltable tr.lmissing td { background: var(--red-bg); }
+.ltable tr.lmissing .ldate { color: var(--red); font-weight: 700; }
+.ltable tr.lweekend td { opacity: .35; }
+.ltable tr.ldata:hover td { background: var(--surface2); }
+.ltable tr.ltoday .ldate { color: var(--green); font-weight: 700; }
+.ltable tr.ltoday td { background: var(--green-bg); }
+.ltable tr.ldaytotal td { background: var(--blue-bg); border-bottom: 2px solid var(--border2); }
+.ldate { white-space: nowrap; font-size: 13px; color: var(--text2); }
+.ltime { font-weight: 700; color: var(--blue); font-size: 14px; vertical-align: middle; text-align: right; }
+.lshort { display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 700; color: var(--red); background: var(--red-bg); padding: 2px 7px; border-radius: 20px; white-space: nowrap; }
+.lok { display: inline-block; margin-left: 6px; font-size: 12px; font-weight: 700; color: var(--green); }
+.lover { display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 700; color: var(--green); background: var(--green-bg); padding: 2px 7px; border-radius: 20px; white-space: nowrap; }
+.llink { color: var(--blue); text-decoration: none; font-weight: 700; font-size: 13px; }
+.llink:hover { text-decoration: underline; }
+
+/* ── MODALS ── */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.65); z-index: 200; align-items: center; justify-content: center; backdrop-filter: blur(6px); }
+.modal-overlay.open { display: flex; }
+.modal { background: var(--surface); border: 1px solid var(--border2); border-radius: 16px; padding: 28px; width: 480px; max-width: 95vw; box-shadow: var(--shadow-lg); animation: modalIn .18s ease; }
+@keyframes modalIn { from { opacity:0; transform:scale(.96) translateY(6px); } to { opacity:1; transform:none; } }
+.modal-title { font-size: 18px; font-weight: 800; margin-bottom: 6px; letter-spacing: -.3px; }
+.modal-sub { font-size: 13px; color: var(--text3); margin-bottom: 22px; }
+.modal-footer { display: flex; gap: 8px; justify-content: flex-end; margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--border); }
+
+/* ── MISC ── */
+.loading { text-align: center; padding: 64px 20px; color: var(--text3); font-size: 14px; }
+.spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid var(--border2); border-top-color: var(--blue); border-radius: 50%; animation: spin .6s linear infinite; margin-right: 10px; vertical-align: middle; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.empty { text-align: center; padding: 72px 20px; color: var(--text3); }
+.empty .eicon { font-size: 42px; margin-bottom: 14px; opacity: .4; }
+.empty p { font-size: 14px; }
+.section-label { font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: .8px; margin: 24px 0 12px; }
+.divider { height: 1px; background: var(--border); }
+.fab-group { position: fixed; bottom: 28px; right: 28px; z-index: 90; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.fab {
+  width: 54px; height: 54px; border-radius: 50%;
+  background: var(--blue); color: #fff;
+  border: none; cursor: pointer;
+  font-size: 22px; line-height: 1;
+  box-shadow: 0 4px 20px rgba(45,212,191,.4);
+  transition: transform .15s, box-shadow .15s;
+  display: flex; align-items: center; justify-content: center;
+}
+.fab:hover { transform: scale(1.08); box-shadow: 0 6px 28px rgba(45,212,191,.6); }
+.fab:active { transform: scale(.96); }
+.fab.fab-secondary { background: var(--surface3); color: var(--blue); border: 1.5px solid var(--blue); font-size: 20px; box-shadow: 0 4px 16px rgba(45,212,191,.2); }
+.fab-label { font-size: 10px; font-weight: 700; color: var(--text3); letter-spacing: .5px; text-transform: uppercase; margin-top: -6px; }
+.toast { position: fixed; bottom: 24px; right: 24px; z-index: 300; background: var(--surface); border: 1px solid var(--green); color: var(--green); padding: 12px 18px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; box-shadow: var(--shadow-lg); animation: toastIn .2s ease; }
+.toast.error { border-color: var(--red); color: var(--red); }
+@keyframes toastIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <a class="logo" href="#">
+    <svg viewBox="0 0 24 24" fill="none"><path d="M12 2L2 9l2 11 8 2 8-2 2-11L12 2z" fill="#e24329"/><path d="M12 2l4 9H8l4-9z" fill="#fc6d26"/><path d="M2 9l6 2-6 9 0-11z" fill="#e24329"/><path d="M22 9l-6 2 6 9 0-11z" fill="#e24329"/><path d="M8 11l4 11-6-9 2-2z" fill="#fc6d26"/><path d="M16 11l-4 11 6-9-2-2z" fill="#fc6d26"/></svg>
+    <span class="logo-text">My<em>Lab</em></span>
+  </a>
+  <div class="header-sep"></div>
+  <span class="header-label">Personal Dashboard</span>
+  <div class="header-right">
+    <button class="theme-toggle" onclick="openSettings()" title="Settings (S)" style="font-size:15px">⚙</button>
+    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme" id="themeBtn">🌙</button>
+    <div class="user-pill" id="userInfo">
+      <span class="user-pill-name">Connecting…</span>
+    </div>
+  </div>
+</div>
+
+<div class="config-bar">
+  <input id="baseInput" value="https://codelab.ba-systems.com">
+  <input type="password" id="tokenInput">
+  <button onclick="connect()">Connect</button>
+  <span id="connectStatus"></span>
+</div>
+
+<div class="shell">
+  <div class="sidebar">
+    <div class="nav-group">Overview</div>
+    <div class="nav-item active" onclick="showPage('dashboard')" id="nav-dashboard">
+      <span class="nav-icon">⬡</span> Dashboard
+    </div>
+
+    <div class="nav-group">Work</div>
+    <div class="nav-item" onclick="showPage('issues')" id="nav-issues">
+      <span class="nav-icon">📋</span> My Issues
+      <span class="nav-badge" id="issueCount" style="display:none">0</span>
+    </div>
+    <div class="nav-item" onclick="showPage('create')" id="nav-create">
+      <span class="nav-icon">✦</span> New Log Entry
+    </div>
+
+    <div class="nav-group">Reports</div>
+    <div class="nav-item" onclick="showPage('log')" id="nav-log">
+      <span class="nav-icon">📅</span> Monthly Log
+    </div>
+    <div class="nav-item" onclick="showPage('time')" id="nav-time">
+      <span class="nav-icon">⏱</span> Time Report
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="dash-welcome">
+        <h1 id="dashGreet">Good morning 👋</h1>
+        <p id="dashDate" style="color:var(--text2)"></p>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi">
+          <div class="kpi-accent" style="background:var(--blue)"></div>
+          <div class="kpi-label">Open Issues</div>
+          <div class="kpi-value" style="color:var(--blue)" id="kpiOpen">—</div>
+          <div class="kpi-sub">assigned to me</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-accent" style="background:var(--purple)"></div>
+          <div class="kpi-label">This Month</div>
+          <div class="kpi-value" style="color:var(--purple)" id="kpiMonth">—</div>
+          <div class="kpi-sub">hours logged</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-accent" style="background:var(--green)"></div>
+          <div class="kpi-label">Days Worked</div>
+          <div class="kpi-value" style="color:var(--green)" id="kpiDays">—</div>
+          <div class="kpi-sub" id="kpiDaysSub">this month</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-accent" style="background:var(--red)"></div>
+          <div class="kpi-label">Missing Days</div>
+          <div class="kpi-value" style="color:var(--red)" id="kpiMissing">—</div>
+          <div class="kpi-sub">no time logged</div>
+        </div>
+      </div>
+
+      <div class="dash-grid">
+        <div class="dash-card">
+          <div class="dash-card-hd">
+            <h3>Recent Open Issues</h3>
+            <button class="btn btn-ghost btn-sm" onclick="showPage('issues')">View all →</button>
+          </div>
+          <div class="dash-card-body" id="dashIssues">
+            <div class="loading"><span class="spinner"></span>Loading…</div>
+          </div>
+        </div>
+        <div class="dash-card">
+          <div class="dash-card-hd">
+            <h3>This Week's Hours</h3>
+          </div>
+          <div class="dash-card-body" id="dashWeek">
+            <div class="loading"><span class="spinner"></span>Loading…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MY ISSUES -->
+    <div class="page" id="page-issues">
+      <div class="page-hd">
+        <h2>My Issues</h2>
+        <div class="page-hd-right">
+          <button class="btn btn-ghost btn-sm" onclick="cacheClear();loadMyIssues()">… Refresh</button>
+        </div>
+      </div>
+      <div class="filter-row">
+        <input class="filter-input wide" type="text" id="searchInput" placeholder="🔍  Search issues…" oninput="renderIssues(allIssues)">
+        <select class="filter-input" id="projectFilter" onchange="renderIssues(allIssues)">
+          <option value="">All Projects</option>
+        </select>
+        <select class="filter-input" id="stateFilter" onchange="loadMyIssues()">
+          <option value="opened">Open</option>
+          <option value="closed">Closed</option>
+          <option value="all">All</option>
+        </select>
+      </div>
+      <div id="issuesList"><div class="loading"><span class="spinner"></span>Connecting…</div></div>
+    </div>
+
+    <!-- CREATE -->
+    <div class="page" id="page-create">
+      <div class="page-hd"><h2>New Log Entry</h2></div>
+
+      <!-- MODE TABS -->
+      <div class="ml-tabs" style="max-width:340px;margin-bottom:20px">
+        <button class="ml-tab active" id="nleTab1" onclick="nleSwitchTab(1)">✦ Single Issue</button>
+        <button class="ml-tab" id="nleTab2" onclick="nleSwitchTab(2)">⊞ Bulk Entry</button>
+      </div>
+
+      <!-- SINGLE MODE -->
+      <div id="nlePane1">
+        <div class="nle-layout">
+          <!-- LEFT: Issue Details -->
+          <div class="nle-card">
+            <div class="nle-card-hd">
+              <span class="nle-card-icon">📋</span>
+              <span class="nle-card-title">Issue Details</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Project <span class="req">*</span></label>
+              <div class="sd-wrap" id="sdProject">
+                <div class="sd-display" onclick="sdToggle('sdProject')" id="sdProject_display">
+                  <span id="sdProject_label" class="sd-placeholder">— Select a project —</span>
+                  <span class="sd-arrow">▾</span>
+                </div>
+                <div class="sd-dropdown" id="sdProject_drop">
+                  <div class="sd-search-wrap"><input class="sd-search" id="sdProject_search" placeholder="Search projects…" oninput="sdFilter('sdProject')" onclick="event.stopPropagation()"></div>
+                  <div class="sd-list" id="sdProject_list"></div>
+                </div>
+              </div>
+              <input type="hidden" id="createProject">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Issue Title <span class="req">*</span></label>
+              <input type="text" class="form-input" id="createTitle" placeholder="What needs to be done?">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Description <span style="color:var(--text3);font-weight:400">(optional)</span></label>
+              <textarea class="form-input" id="createDesc" rows="3" placeholder="Steps, context, links…"></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Assignee</label>
+              <div class="assignee-row">
+                <div class="assignee-me" id="assigneeMe">
+                  <span class="assignee-avatar" id="assigneeAvatar">?</span>
+                  <span id="assigneeName">Loading…</span>
+                </div>
+                <button class="btn btn-ghost btn-sm" onclick="toggleAssignee()" id="assigneeToggle">✕ Remove</button>
+              </div>
+            </div>
+          </div>
+          <!-- RIGHT: Time Entries -->
+          <div class="nle-card">
+            <div class="nle-card-hd">
+              <span class="nle-card-icon">⏱</span>
+              <span class="nle-card-title">Time Entries</span>
+              <span class="nle-card-sub">optional</span>
+            </div>
+            <div id="timeEntryList"></div>
+            <button class="nle-add-row" onclick="addTimeRow()">
+              <span style="font-size:18px;line-height:1">+</span> Add Time Entry
+            </button>
+            <div class="nle-time-summary" id="timeSummary" style="display:none">
+              <span style="color:var(--text3);font-size:12px">TOTAL</span>
+              <span id="timeSummaryVal" style="color:var(--blue);font-weight:800;font-size:18px">0h</span>
+            </div>
+            <div class="nle-close-opt" id="nleCloseOpt" style="display:none">
+              <label class="nle-check-row">
+                <input type="checkbox" id="createAndClose" style="width:15px;height:15px;accent-color:var(--red);cursor:pointer;flex-shrink:0">
+                <span>Close issue after creating &amp; logging</span>
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="nle-footer">
+          <button class="btn btn-ghost" onclick="resetCreateForm()">… Clear Form</button>
+          <button class="btn btn-primary" onclick="createIssue()">✦ Submit Entry</button>
+        </div>
+      </div>
+
+      <!-- BULK MODE -->
+      <div id="nlePane2" style="display:none">
+        <div class="nle-card" style="max-width:100%">
+          <div class="nle-card-hd">
+            <span class="nle-card-icon">🔍</span>
+            <span class="nle-card-title">Project</span>
+            <span class="nle-card-sub">all rows use the same project</span>
+          </div>
+          <div style="max-width:420px">
+            <div class="sd-wrap" id="sdBulkProject">
+              <div class="sd-display" onclick="sdToggle('sdBulkProject')" id="sdBulkProject_display">
+                <span id="sdBulkProject_label" class="sd-placeholder">— Select a project —</span>
+                <span class="sd-arrow">▾</span>
+              </div>
+              <div class="sd-dropdown" id="sdBulkProject_drop">
+                <div class="sd-search-wrap"><input class="sd-search" id="sdBulkProject_search" placeholder="Search projects…" oninput="sdFilter('sdBulkProject')" onclick="event.stopPropagation()"></div>
+                <div class="sd-list" id="sdBulkProject_list"></div>
+              </div>
+            </div>
+            <input type="hidden" id="bulkProject">
+          </div>
+        </div>
+
+        <div class="nle-card" style="max-width:100%;margin-top:14px">
+          <div class="nle-card-hd">
+            <span class="nle-card-icon">⏱</span>
+            <span class="nle-card-title">Issue Entries</span>
+            <span class="nle-card-sub">each row = one issue + time log</span>
+          </div>
+
+          <div id="bulkRowList"></div>
+
+          <button class="nle-add-row" onclick="addBulkRow()" style="margin-top:8px">
+            <span style="font-size:18px;line-height:1">+</span> Add Row
+          </button>
+        </div>
+
+        <div class="nle-footer">
+          <button class="btn btn-ghost" onclick="resetBulkForm()">… Clear</button>
+          <button class="btn btn-primary" onclick="submitBulk()">⊞ Submit All</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- TIME REPORT -->
+    <div class="page" id="page-time">
+      <div class="page-hd">
+        <h2>Time Report</h2>
+        <span class="month-tag" id="timeMonthLabel"></span>
+        <div class="page-hd-right">
+          <button class="btn btn-ghost btn-sm" onclick="cacheClear();loadTimeReport()">… Refresh</button>
+        </div>
+      </div>
+      <div class="stats-row">
+        <div class="stat-box">   <div class="stat-label">This Month</div>  <div class="stat-value" style="color:var(--blue)"   id="statMonth">—</div><div class="stat-sub">hours spent</div></div>
+        <div class="stat-box g"><div class="stat-label">Projects</div><div class="stat-value" style="color:var(--green)"  id="statIssues">—</div><div class="stat-sub">with time logged</div></div>
+        <div class="stat-box p"><div class="stat-label">All Time Total</div><div class="stat-value" style="color:var(--purple)" id="statTotal">—</div><div class="stat-sub">all my issues</div></div>
+      </div>
+      <div class="section-label">Breakdown by Project</div>
+      <div id="timeList"><div class="empty"><div class="eicon">⏱</div><p>Loading…</p></div></div>
+    </div>
+
+    <!-- MONTHLY LOG -->
+    <div class="page" id="page-log">
+      <div class="page-hd">
+        <h2>Monthly Log</h2>
+        <span class="month-tag" id="logMonthLabel"></span>
+        <div class="page-hd-right">
+          <button class="btn btn-ghost btn-sm" onclick="cacheClear();loadMonthlyLog()">… Refresh</button>
+        </div>
+      </div>
+      <div id="logTable"><div class="empty"><div class="eicon">📅</div><p>Loading…</p></div></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- FAB GROUP -->
+<div class="fab-group" id="fabGroup" style="display:flex">
+  <button class="fab fab-secondary" onclick="openQuickCreate()" title="Create Issue & Log Time">✦</button>
+  <button class="fab" onclick="openQuickLog()" title="Quick Log Time">⏱</button>
+</div>
+
+<!-- QUICK CREATE MODAL -->
+<div class="modal-overlay" id="quickCreateModal">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-title">✦ Quick Create Issue</div>
+    <div class="modal-sub">Create, log time, and optionally close — all at once</div>
+
+    <div class="form-group" style="margin-top:4px">
+      <label class="form-label">Project <span class="req">*</span></label>
+      <div class="sd-wrap" id="sdQcProject">
+        <div class="sd-display" onclick="sdToggle('sdQcProject')" id="sdQcProject_display">
+          <span id="sdQcProject_label" class="sd-placeholder">— Select a project —</span>
+          <span class="sd-arrow">▾</span>
+        </div>
+        <div class="sd-dropdown" id="sdQcProject_drop">
+          <div class="sd-search-wrap"><input class="sd-search" id="sdQcProject_search" placeholder="Search projects…" oninput="sdFilter('sdQcProject')" onclick="event.stopPropagation()"></div>
+          <div class="sd-list" id="sdQcProject_list"></div>
+        </div>
+      </div>
+      <input type="hidden" id="qcProject">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Issue Title <span class="req">*</span></label>
+      <input type="text" class="form-input" id="qcTitle" placeholder="What needs to be done?">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Description <span style="color:var(--text3);font-weight:400">(optional)</span></label>
+      <textarea class="form-input" id="qcDesc" rows="2" placeholder="Steps, context, links…"></textarea>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="form-group" style="margin:0">
+        <label class="form-label">Time Spent</label>
+        <input type="text" class="form-input" id="qcDuration" placeholder="2h / 1h30m">
+      </div>
+      <div class="form-group" style="margin:0">
+        <label class="form-label">Date</label>
+        <input type="date" class="form-input" id="qcDate">
+      </div>
+    </div>
+
+    <div class="form-group" style="margin-top:10px">
+      <label class="form-label">Time Log Note <span style="color:var(--text3);font-weight:400">(optional)</span></label>
+      <input type="text" class="form-input" id="qcSummary" placeholder="What did you work on? (attached to the time entry)">
+    </div>
+
+    <div style="display:flex;align-items:center;gap:10px;padding:14px 0 2px">
+      <input type="checkbox" id="qcClose" style="width:15px;height:15px;cursor:pointer;accent-color:var(--red)">
+      <label for="qcClose" style="font-size:13px;font-weight:600;color:var(--text2);cursor:pointer">Close issue after creating</label>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('quickCreateModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitQuickCreate()">✦ Create →</button>
+    </div>
+  </div>
+</div>
+
+<!-- QUICK LOG MODAL -->
+<div class="modal-overlay" id="quickLogModal">
+  <div class="modal">
+    <div class="modal-title">⏱ Quick Log Time</div>
+    <div class="modal-sub">Log time spent on an issue</div>
+    <div class="form-group">
+      <label class="form-label">Issue</label>
+      <select class="form-input" id="quickIssue" style="font-size:13px">
+        <option value="">— Select an open issue —</option>
+      </select>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="form-group" style="margin:0">
+        <label class="form-label">Time Spent</label>
+        <input type="text" class="form-input" id="quickDuration" placeholder="2h30m / 1h / 45m">
+      </div>
+      <div class="form-group" style="margin:0">
+        <label class="form-label">Date</label>
+        <input type="date" class="form-input" id="quickDate">
+      </div>
+    </div>
+    <div class="form-group" style="margin-top:12px">
+      <label class="form-label">Summary <span style="color:var(--text3);font-weight:400">(optional note)</span></label>
+      <input type="text" class="form-input" id="quickSummary" placeholder="What did you work on?">
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 0 2px">
+      <input type="checkbox" id="quickClose" style="width:15px;height:15px;cursor:pointer;accent-color:var(--red)">
+      <label for="quickClose" style="font-size:13px;font-weight:600;color:var(--text2);cursor:pointer">Close this issue after logging</label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('quickLogModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitQuickLog()">Log Time →</button>
+    </div>
+  </div>
+</div>
+
+<!-- TIME MODAL -->
+<div class="modal-overlay" id="timeModal">
+  <div class="modal">
+    <div class="modal-title">Log Time</div>
+    <div class="modal-sub" id="timeModalIssue"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="form-group" style="margin:0">
+        <label class="form-label">Duration</label>
+        <input type="text" class="form-input" id="timeInput" placeholder="2h30m / 1h / 45m">
+      </div>
+      <div class="form-group" style="margin:0">
+        <label class="form-label">Date</label>
+        <input type="date" class="form-input" id="timeDate">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Summary <span style="color:var(--text3);font-weight:400">(optional)</span></label>
+      <input type="text" class="form-input" id="timeSummaryInput" placeholder="What did you work on?">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('timeModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitTime()">Log Time →</button>
+    </div>
+  </div>
+</div>
+
+<!-- MISSING LOG MODAL -->
+<div class="modal-overlay" id="missingLogModal">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-title">⏱ Log Time for <span id="mlDate" style="color:var(--blue)"></span></div>
+    <div class="modal-sub">Log time on an existing issue or create a new one for this day</div>
+
+    <!-- tabs -->
+    <div class="ml-tabs">
+      <button class="ml-tab active" id="mlTab1" onclick="mlSwitchTab(1)">Existing Issue</button>
+      <button class="ml-tab" id="mlTab2" onclick="mlSwitchTab(2)">New Issue</button>
+    </div>
+
+    <!-- tab 1: existing issue via Quick Log -->
+    <div id="mlPane1">
+      <div class="form-group" style="margin-top:14px">
+        <label class="form-label">Issue</label>
+        <div class="sd-wrap" id="sdMlIssue">
+          <div class="sd-display" onclick="sdToggle('sdMlIssue')" id="sdMlIssue_display">
+            <span id="sdMlIssue_label" class="sd-placeholder">— Select an open issue —</span>
+            <span class="sd-arrow">▾</span>
+          </div>
+          <div class="sd-dropdown" id="sdMlIssue_drop">
+            <div class="sd-search-wrap"><input class="sd-search" id="sdMlIssue_search" placeholder="Search issues…" oninput="sdFilter('sdMlIssue')" onclick="event.stopPropagation()"></div>
+            <div class="sd-list" id="sdMlIssue_list"></div>
+          </div>
+        </div>
+        <input type="hidden" id="mlIssue">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Time Spent</label>
+        <input type="text" class="form-input" id="mlDuration" placeholder="2h30m / 1h / 45m">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Summary <span style="color:var(--text3);font-weight:400">(optional)</span></label>
+        <input type="text" class="form-input" id="mlSummary" placeholder="What did you work on?">
+      </div>
+    </div>
+
+    <!-- tab 2: new issue -->
+    <div id="mlPane2" style="display:none">
+      <div class="form-group" style="margin-top:14px">
+        <label class="form-label">Project <span class="req">*</span></label>
+        <div class="sd-wrap" id="sdMlProject">
+          <div class="sd-display" onclick="sdToggle('sdMlProject')" id="sdMlProject_display">
+            <span id="sdMlProject_label" class="sd-placeholder">— Select a project —</span>
+            <span class="sd-arrow">▾</span>
+          </div>
+          <div class="sd-dropdown" id="sdMlProject_drop">
+            <div class="sd-search-wrap"><input class="sd-search" id="sdMlProject_search" placeholder="Search projects…" oninput="sdFilter('sdMlProject')" onclick="event.stopPropagation()"></div>
+            <div class="sd-list" id="sdMlProject_list"></div>
+          </div>
+        </div>
+        <input type="hidden" id="mlProject">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Issue Title <span class="req">*</span></label>
+        <input type="text" class="form-input" id="mlTitle" placeholder="What did you work on?">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Time Spent</label>
+        <input type="text" class="form-input" id="mlDuration2" placeholder="2h30m / 1h / 45m">
+      </div>
+    </div>
+
+    <input type="hidden" id="mlDateVal">
+    <div style="display:flex;align-items:center;gap:10px;padding:14px 0 2px">
+      <input type="checkbox" id="mlClose" style="width:15px;height:15px;cursor:pointer;accent-color:var(--red)">
+      <label for="mlClose" style="font-size:13px;font-weight:600;color:var(--text2);cursor:pointer">Close this issue after logging</label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('missingLogModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitMissingLog()">Log Time →</button>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-title">⚙ Settings</div>
+    <div class="modal-sub">Configure your GitLab connection and work schedule</div>
+
+    <div class="form-group">
+      <label class="form-label">GitLab Base URL</label>
+      <input type="text" class="form-input" id="cfgUrl" placeholder="https://gitlab.example.com">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Private Token <span class="req">*</span></label>
+      <input type="password" class="form-input" id="cfgToken" placeholder="glpat-xxxxxxxxxxxx">
+    </div>
+
+    <div style="height:1px;background:var(--border);margin:20px 0"></div>
+
+    <div class="form-label" style="margin-bottom:12px">Saturday Schedule — select which Saturdays are <span style="color:var(--red)">OFF</span></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <label style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-xs);cursor:pointer">
+        <input type="checkbox" id="sat1off" style="width:16px;height:16px;accent-color:var(--red);cursor:pointer">
+        <span style="font-size:13px;font-weight:600">1st Saturday <span style="color:var(--red);font-size:11px">OFF</span></span>
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-xs);cursor:pointer">
+        <input type="checkbox" id="sat2off" style="width:16px;height:16px;accent-color:var(--red);cursor:pointer">
+        <span style="font-size:13px;font-weight:600">2nd Saturday <span style="color:var(--red);font-size:11px">OFF</span></span>
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-xs);cursor:pointer">
+        <input type="checkbox" id="sat3off" style="width:16px;height:16px;accent-color:var(--red);cursor:pointer">
+        <span style="font-size:13px;font-weight:600">3rd Saturday <span style="color:var(--red);font-size:11px">OFF</span></span>
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-xs);cursor:pointer">
+        <input type="checkbox" id="sat4off" style="width:16px;height:16px;accent-color:var(--red);cursor:pointer">
+        <span style="font-size:13px;font-weight:600">4th Saturday <span style="color:var(--red);font-size:11px">OFF</span></span>
+      </label>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px">
+      <div class="form-group" style="margin:0">
+        <label class="form-label">Working Saturday Hours</label>
+        <input type="number" class="form-input" id="cfgSatHours" min="1" max="12" placeholder="7" style="text-align:center">
+      </div>
+      <div class="form-group" style="margin:0">
+        <label class="form-label">Regular Workday Hours</label>
+        <input type="number" class="form-input" id="cfgDayHours" min="1" max="12" placeholder="8" style="text-align:center">
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin-top:10px">Friday is always OFF. Checked Saturdays = OFF day. Unchecked = working day.</div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('settingsModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSettings()">✓ Save &amp; Connect</button>
+    </div>
+  </div>
+</div>
+
+<!-- CLOSE MODAL -->
+<div class="modal-overlay" id="closeModal">
+  <div class="modal">
+    <div class="modal-title">Close Issue</div>
+    <div class="modal-sub">The issue will be marked closed. You can reopen it anytime.</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="form-group" style="margin:0">
+        <label class="form-label">Time (optional)</label>
+        <input type="text" class="form-input" id="closeTimeInput" placeholder="1h30m">
+      </div>
+      <div class="form-group" style="margin:0">
+        <label class="form-label">Date</label>
+        <input type="date" class="form-input" id="closeDate">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('closeModal')">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmClose()">Close Issue</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── CONFIG (localStorage) ──
+const CFG_KEY = 'mylab_cfg';
+let CFG = {};
+function loadCfg() {
+  try { CFG = JSON.parse(localStorage.getItem(CFG_KEY) || '{}'); } catch { CFG = {}; }
+}
+function saveCfg(obj) {
+  CFG = { ...CFG, ...obj };
+  localStorage.setItem(CFG_KEY, JSON.stringify(CFG));
+}
+loadCfg();
+
+// sat_off: array of 1-based Saturday numbers that are OFF (e.g. [1,2,3])
+// default: all 4 Saturdays are working (empty off list), only Friday off
+function getSatOff() { return CFG.sat_off || []; }
+
+const DEFAULT_URL = 'https://codelab.ba-systems.com';
+let API   = (CFG.url || DEFAULT_URL).replace(/\/$/, '') + '/api/v4';
+let TOKEN = CFG.token || '';
+let ME = null, allIssues = [], allProjects = [];
+let activeIssueIid = null, activeProjectId = null;
+let dashMonthData = null;
+
+// ── THEME ──
+function toggleTheme() {
+  const html = document.documentElement;
+  const isDark = html.dataset.theme === 'dark';
+  html.dataset.theme = isDark ? 'light' : 'dark';
+  document.getElementById('themeBtn').textContent = isDark ? '🌙' : '☀️️';
+  localStorage.setItem('theme', html.dataset.theme);
+}
+(function initTheme() {
+  const saved = localStorage.getItem('theme') || 'dark';
+  document.documentElement.dataset.theme = saved;
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('themeBtn').textContent = saved === 'dark' ? '☀️️' : '🌙';
+  });
+})();
+
+// ?? GraphQL helper ??
+async function gql(query) {
+  const GRAPHQL = (CFG.url || DEFAULT_URL).replace(/\/$/, '') + '/api/graphql';
+  const res = await fetch(GRAPHQL, {
+    method: 'POST',
+    headers: { 'PRIVATE-TOKEN': TOKEN, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query })
+  });
+  if (!res.ok) throw new Error(`GraphQL ${res.status}`);
+  const json = await res.json();
+  if (json.errors?.length) throw new Error(json.errors[0].message);
+  return json.data;
+}
+
+function parseDurToSecs(s) {
+  if (!s) return 0;
+  let secs = 0;
+  const d = s.match(/(\d+(?:\.\d+)?)d/i); if (d) secs += parseFloat(d[1]) * 8 * 3600;
+  const h = s.match(/(\d+(?:\.\d+)?)h/i); if (h) secs += parseFloat(h[1]) * 3600;
+  const m = s.match(/(\d+)m/i);           if (m) secs += parseInt(m[1]) * 60;
+  return secs;
+}
+
+async function logTimeGQL(pid, iid, duration, date, summary) {
+  const proj = allProjects.find(p => String(p.id) === String(pid));
+  if (!proj) throw new Error('Project not found');
+  const projPath = proj.path_with_namespace;
+  const d1 = await gql(`{ project(fullPath: "${projPath}") { issue(iid: "${iid}") { id } } }`);
+  const gid = d1?.project?.issue?.id;
+  if (!gid) throw new Error('Issue not found via GraphQL');
+  if (!parseDurToSecs(duration)) throw new Error('Invalid duration');
+  const spentAt = date || new Date().toISOString().slice(0, 10);
+  const sum = (summary || duration).replace(/["\n\r]/g, ' ');
+  const d2 = await gql(`mutation { timelogCreate(input: { issuableId: "${gid}", spentAt: "${spentAt}", timeSpent: "${duration}", summary: "${sum}" }) { timelog { id spentAt timeSpent } errors } }`);
+  if (d2?.timelogCreate?.errors?.length) throw new Error(d2.timelogCreate.errors[0]);
+  return d2?.timelogCreate?.timelog;
+}
+
+// ── API ──
+async function req(path, method='GET', body=null) {
+  const res = await fetch(API + path, {
+    method,
+    headers: { 'PRIVATE-TOKEN': TOKEN, 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : null
+  });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return res.json();
+}
+async function reqAll(path) {
+  let page = 1, out = [];
+  while (true) {
+    const sep = path.includes('?') ? '&' : '?';
+    const res = await fetch(`${API}${path}${sep}per_page=100&page=${page}`, { headers: { 'PRIVATE-TOKEN': TOKEN } });
+    if (!res.ok) break;
+    const data = await res.json();
+    if (!data.length) break;
+    out = out.concat(data);
+    if (data.length < 100) break;
+    page++;
+  }
+  return out;
+}
+
+// ── CONNECT ──
+async function connect() {
+  try {
+    ME = await req('/user');
+    document.getElementById('userInfo').innerHTML =
+      `<img src="${ME.avatar_url}" style="width:26px;height:26px;border-radius:50%"><span class="user-pill-name">${ME.name}</span>`;
+    await loadProjects();
+    await Promise.all([loadMyIssues(), loadDashboard()]);
+    updateLabels();
+  } catch(e) { toast('Connection failed: ' + e.message, true); }
+}
+
+// ── PROJECTS ──
+async function loadProjects() {
+  allProjects = await reqAll('/projects?membership=true&simple=true&order_by=last_activity_at');
+  const pf = document.getElementById('projectFilter');
+  pf.innerHTML = '<option value="">All Projects</option>';
+  allProjects.forEach(p => {
+    pf.innerHTML += `<option value="${p.id}">${p.name_with_namespace}</option>`;
+  });
+  // populate searchable dropdown for create page
+  sdPopulate('sdProject', allProjects.map(p => ({ value: String(p.id), label: p.name_with_namespace })));
+}
+
+// ── SEARCHABLE DROPDOWN ──
+const _sdData = {};
+function sdPopulate(id, items) {
+  _sdData[id] = items;
+  const list = document.getElementById(id + '_list');
+  list.innerHTML = items.length
+    ? items.map(it => `<div class="sd-opt" data-value="${it.value}" onclick="sdSelect('${id}','${it.value}',this)">${it.label}</div>`).join('')
+    : '<div class="sd-empty">No items</div>';
+}
+function sdToggle(id) {
+  const wrap = document.getElementById(id);
+  const isOpen = wrap.classList.contains('open');
+  document.querySelectorAll('.sd-wrap.open').forEach(w => w.classList.remove('open'));
+  if (!isOpen) {
+    wrap.classList.add('open');
+    const search = document.getElementById(id + '_search');
+    if (search) { search.value = ''; sdFilter(id); setTimeout(() => search.focus(), 50); }
+  }
+}
+function sdFilter(id) {
+  const q = (document.getElementById(id + '_search').value || '').toLowerCase();
+  const opts = document.querySelectorAll(`#${id}_list .sd-opt`);
+  let visible = 0;
+  opts.forEach(o => {
+    const match = o.textContent.toLowerCase().includes(q);
+    o.classList.toggle('hidden', !match);
+    if (match) visible++;
+  });
+  let empty = document.querySelector(`#${id}_list .sd-empty`);
+  if (!empty) { empty = document.createElement('div'); empty.className = 'sd-empty'; document.getElementById(id + '_list').appendChild(empty); }
+  empty.style.display = visible === 0 ? 'block' : 'none';
+  empty.textContent = 'No results for "' + document.getElementById(id + '_search').value + '"';
+}
+// sdHiddenId: maps sd wrapper id → hidden input id
+const _sdHidden = { sdProject: 'createProject', sdMlIssue: 'mlIssue', sdMlProject: 'mlProject', sdQcProject: 'qcProject', sdBulkProject: 'bulkProject' };
+function sdSelect(id, value, el) {
+  const item = (_sdData[id] || []).find(i => i.value === value);
+  if (!item) return;
+  document.getElementById(id + '_label').textContent = item.label;
+  document.getElementById(id + '_label').className = 'sd-selected-text';
+  const hiddenId = _sdHidden[id] || id.replace('sd', 'create');
+  document.getElementById(hiddenId).value = value;
+  document.querySelectorAll(`#${id}_list .sd-opt`).forEach(o => o.classList.remove('selected'));
+  if (el) el.classList.add('selected');
+  document.getElementById(id).classList.remove('open');
+}
+function sdReset(id, placeholder) {
+  const lbl = document.getElementById(id + '_label');
+  if (lbl) { lbl.textContent = placeholder; lbl.className = 'sd-placeholder'; }
+  const hiddenId = _sdHidden[id] || id.replace('sd', 'create');
+  const hidden = document.getElementById(hiddenId);
+  if (hidden) hidden.value = '';
+  document.querySelectorAll(`#${id}_list .sd-opt`).forEach(o => o.classList.remove('selected'));
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('.sd-wrap')) document.querySelectorAll('.sd-wrap.open').forEach(w => w.classList.remove('open'));
+});
+
+// ── LABELS ──
+function updateLabels() {
+  const now = new Date();
+  const label = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  document.getElementById('timeMonthLabel').textContent = label;
+  document.getElementById('logMonthLabel').textContent = label;
+}
+
+// ── DASHBOARD ──
+async function loadDashboard() {
+  const now = new Date();
+  const h = now.getHours();
+  const greet = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+  document.getElementById('dashGreet').textContent = `${greet}, ${ME?.name?.split(' ')[0] || ''} 👋`;
+  document.getElementById('dashDate').textContent = now.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+
+  // Load open issues for KPI + recent list
+  let open = gc('openIssues');
+  if (!open) { open = await reqAll(`/issues?assignee_username=${ME.username}&state=opened&scope=all`); sc('openIssues', open); }
+  document.getElementById('kpiOpen').textContent = open.length;
+
+  // Recent 8 open issues
+  const recent = open.slice(0, 8);
+  document.getElementById('dashIssues').innerHTML = recent.length ? recent.map(i => {
+    const proj = i.references?.full?.split('#')[0] || i.web_url.split('/-/')[0].split('/').slice(-2).join('/');
+    return `<div class="dash-issue-row" onclick="window.open('${i.web_url}','_blank')">
+      <div class="dash-issue-num">#${i.iid}</div>
+      <div><div class="dash-issue-title">${i.title}</div><div class="dash-issue-proj">${proj}</div></div>
+    </div>`;
+  }).join('') : '<div class="empty"><div class="eicon">✕</div><p>No open issues</p></div>';
+
+  // Monthly log for KPI
+  await loadMonthlyLogData();
+}
+
+// ── CACHE (sessionStorage + memory) ──
+const CACHE_NS = 'mylab_v1_';
+const _mem = {}; // memory cache for this tab session
+
+function sc(key, val) {
+  // set: memory + sessionStorage
+  _mem[key] = val;
+  try { sessionStorage.setItem(CACHE_NS + key, JSON.stringify({ m: new Date().getMonth(), d: val })); } catch {}
+}
+function gc(key) {
+  // get: memory first, then sessionStorage
+  if (_mem[key] !== undefined) return _mem[key];
+  try {
+    const raw = sessionStorage.getItem(CACHE_NS + key);
+    if (!raw) return null;
+    const { m, d } = JSON.parse(raw);
+    if (m !== new Date().getMonth()) { sessionStorage.removeItem(CACHE_NS + key); return null; }
+    _mem[key] = d;
+    return d;
+  } catch { return null; }
+}
+function cacheClear() {
+  Object.keys(_mem).forEach(k => delete _mem[k]);
+  Object.keys(sessionStorage).filter(k => k.startsWith(CACHE_NS)).forEach(k => sessionStorage.removeItem(k));
+}
+
+// ── SHARED: build dayMap from notes (single source of truth) ──
+let _cachedDayMap = null;
+
+async function fetchIssueTimelogs(issue) {
+  // timelogs API not supported on this GitLab version — notes are the source of truth
+  return [];
+}
+
+async function buildDayMap() {
+  const hit = gc('daymap');
+  if (hit) return hit;
+
+  const now = new Date();
+  const year = now.getFullYear(), month = now.getMonth();
+  const monthStart = new Date(year, month, 1).toISOString();
+  const monthEnd   = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
+  const issues = await reqAll(`/issues?assignee_username=${ME.username}&state=all&scope=all&updated_after=${monthStart}&updated_before=${monthEnd}`);
+
+  // Fetch both notes and per-issue timelogs in parallel
+  const results = await Promise.all(issues.map(async (issue) => {
+    const proj = issue.references?.full?.split('#')[0] || issue.web_url.split('/-/')[0].split('/').slice(-2).join('/');
+    const [notesData, timelogs] = await Promise.all([
+      fetchTimeNotes(issue),
+      fetchIssueTimelogs(issue)
+    ]);
+    return { issue, proj, notes: notesData.notes, timelogs };
+  }));
+
+  const dayMap = {};
+
+  for (const { issue, proj, notes, timelogs } of results) {
+    // Per-date accumulator for this issue — timelogs API is authoritative source
+    // timelogs entries have exact spent_at; notes are fallback for entries without timelog API support
+    const tlDates = new Set(); // track which dates timelogs covered
+    const dateMap = {}; // dateStr -> secs
+
+    // 1. Timelogs API entries (GitLab UI / direct API entries)
+    for (const tl of timelogs) {
+      if (!tl.dateStr) continue;
+      const [ty, tm] = tl.dateStr.split('-').map(Number);
+      if (ty !== year || tm !== month + 1) continue;
+      dateMap[tl.dateStr] = (dateMap[tl.dateStr] || 0) + tl.secs;
+      tlDates.add(tl.dateStr);
+    }
+
+    // 2. Notes entries — only add for dates NOT already covered by timelogs (avoid double-count)
+    for (const note of notes) {
+      const p = parseTimeNote(note.body);
+      if (!p) continue;
+      const [ny, nm] = p.dateStr.split('-').map(Number);
+      if (ny !== year || nm !== month + 1) continue;
+      if (tlDates.has(p.dateStr)) continue; // timelogs already has this date
+      dateMap[p.dateStr] = (dateMap[p.dateStr] || 0) + p.secs;
+    }
+
+    for (const [dateStr, secs] of Object.entries(dateMap)) {
+      if (!dayMap[dateStr]) dayMap[dateStr] = [];
+      const ex = dayMap[dateStr].find(e => e.iid === issue.iid && e.pid === issue.project_id);
+      if (ex) ex.secs += secs;
+      else dayMap[dateStr].push({ iid: issue.iid, title: issue.title, url: issue.web_url, proj, pid: issue.project_id, secs });
+    }
+  }
+
+  sc('daymap', dayMap);
+  return dayMap;
+}
+
+async function loadMonthlyLogData() {
+  const now = new Date();
+  const year = now.getFullYear(), month = now.getMonth();
+  const todayDate = now.getDate();
+  const dayMap = await buildDayMap();
+
+  let totalSecs = 0, workedDays = 0, missingDays = 0;
+  for (let d = 1; d <= todayDate; d++) {
+    const dateObj = new Date(year, month, d);
+    const key = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const daySecs = (dayMap[key] || []).reduce((s, e) => s + e.secs, 0);
+    if (daySecs > 0) { totalSecs += daySecs; workedDays++; }
+    else if (!isWeekend(dateObj, d, year, month)) missingDays++;
+  }
+
+  // Update Dashboard KPIs
+  document.getElementById('kpiMonth').textContent   = fmtH(totalSecs);
+  document.getElementById('kpiDays').textContent    = workedDays;
+  document.getElementById('kpiMissing').textContent = missingDays;
+
+  // This week's bar chart
+  const weekBars = [];
+  for (let back = 6; back >= 0; back--) {
+    const d = new Date(now); d.setDate(now.getDate() - back);
+    if (d.getMonth() !== month || d.getDate() > todayDate) continue;
+    const key = `${year}-${String(month+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const daySecs = (dayMap[key] || []).reduce((s, e) => s + e.secs, 0);
+    const dateStr = d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' });
+    const isOff = isWeekend(d, d.getDate(), year, month);
+    weekBars.push({ dateStr, daySecs, isOff });
+  }
+  const maxSecs = Math.max(...weekBars.map(b => b.daySecs), 1);
+  document.getElementById('dashWeek').innerHTML = weekBars.map(b => {
+    const pct = Math.round((b.daySecs / maxSecs) * 100);
+    const isMissing = !b.isOff && b.daySecs === 0;
+    return `<div class="day-row">
+      <div class="day-date">${b.dateStr}</div>
+      <div class="day-bar-wrap">
+        <div class="day-bar" style="width:${pct}%;background:${isMissing?'var(--red)':(b.isOff&&b.daySecs===0)?'var(--border2)':'var(--blue)'}"></div>
+      </div>
+      <div class="day-hours">${b.daySecs > 0 ? fmtH(b.daySecs) : (isMissing ? '<span style="color:var(--red);font-size:11px">—</span>' : '')}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── MY ISSUES ──
+async function loadMyIssues() {
+  if (!ME) return;
+  const state = document.getElementById('stateFilter').value;
+  document.getElementById('issuesList').innerHTML = '<div class="loading"><span class="spinner"></span>Loading…</div>';
+  try {
+    const cacheKey = `issues_${state}`;
+    allIssues = gc(cacheKey);
+    if (!allIssues) { allIssues = await reqAll(`/issues?assignee_username=${ME.username}&state=${state}&scope=all`); sc(cacheKey, allIssues); }
+    renderIssues(allIssues);
+    // Fetch time_stats in background and update chips
+    allIssues.forEach(async (issue) => {
+      try {
+        const detail = await req(`/projects/${issue.project_id}/issues/${issue.iid}`);
+        const ts = detail.time_stats;
+        const t = ts?.human_time_spent || (ts?.total_time_spent > 0 ? fmtH(ts.total_time_spent) : null);
+        const el = document.getElementById(`time-chip-${issue.project_id}-${issue.iid}`);
+        if (el && t) el.textContent = '⏱ ' + t;
+      } catch {}
+    });
+    const n = allIssues.filter(i => i.state === 'opened').length;
+    const b = document.getElementById('issueCount');
+    b.style.display = n > 0 ? '' : 'none';
+    b.textContent = n;
+  } catch(e) {
+    document.getElementById('issuesList').innerHTML = `<div class="empty"><div class="eicon">⚠️</div><p>${e.message}</p></div>`;
+  }
+}
+
+function renderIssues(issues) {
+  const q    = document.getElementById('searchInput').value.toLowerCase();
+  const proj = document.getElementById('projectFilter').value;
+  let list   = issues;
+  if (q)    list = list.filter(i => i.title.toLowerCase().includes(q) || String(i.iid).includes(q));
+  if (proj) list = list.filter(i => String(i.project_id) === proj);
+  if (!list.length) {
+    document.getElementById('issuesList').innerHTML = '<div class="empty"><div class="eicon">✕</div><p>No issues found</p></div>';
+    return;
+  }
+  document.getElementById('issuesList').innerHTML = list.map(issue => {
+    const pname   = issue.references?.full?.split('#')[0] || issue.web_url.split('/-/')[0].split('/').slice(-2).join('/');
+    const ts = issue.time_stats;
+    const timeTxt = ts?.human_time_spent || (ts?.total_time_spent > 0 ? fmtH(ts.total_time_spent) : null);
+    const isOpen  = issue.state === 'opened';
+    return `<div class="issue-card">
+      <div class="ic-top">
+        <div class="ic-num">#${issue.iid}</div>
+        <div class="ic-body">
+          <div class="ic-title" onclick="window.open('${issue.web_url}','_blank')">${issue.title}</div>
+          <div class="ic-meta">
+            ${isOpen ? '<span class="chip chip-green">▾ Open</span>' : '<span class="chip chip-gray">✓ Closed</span>'}
+            <span class="chip chip-blue">🔍 ${pname}</span>
+            <span class="chip chip-purple" id="time-chip-${issue.project_id}-${issue.iid}">${timeTxt ? '⏱ ' + timeTxt : '⏱ …'}</span>
+          </div>
+        </div>
+      </div>
+      <div class="ic-actions">
+        <button class="btn btn-ghost btn-sm" onclick="openTimeModal(${issue.project_id},${issue.iid},'${issue.title.replace(/'/g,"\\'")}')">⏱ Log Time</button>
+        ${isOpen ? `<button class="btn btn-danger btn-sm" onclick="openCloseModal(${issue.project_id},${issue.iid})">✕ Close</button>` : ''}
+        <a href="${issue.web_url}" target="_blank" style="margin-left:auto"><button class="btn btn-ghost btn-sm">← View</button></a>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── MISSING DAY LOG ──
+function openMissingLogOnIssue(dateStr, pid, iid) {
+  openMissingLog(dateStr);
+  // pre-select the issue in searchable dropdown
+  setTimeout(() => {
+    const val = `${pid}::${iid}`;
+    // try in existing sdData first
+    let item = (_sdData['sdMlIssue'] || []).find(i => i.value === val);
+    if (!item) {
+      // issue may be closed — find in allIssues and inject
+      const found = (allIssues || []).find(i => String(i.project_id) === String(pid) && String(i.iid) === String(iid));
+      if (found) {
+        item = { value: val, label: `#${found.iid} — ${found.title}` };
+        (_sdData['sdMlIssue'] = _sdData['sdMlIssue'] || []).push(item);
+        const list = document.getElementById('sdMlIssue_list');
+        const opt = document.createElement('div');
+        opt.className = 'sd-opt';
+        opt.dataset.value = val;
+        opt.textContent = item.label;
+        opt.onclick = function() { sdSelect('sdMlIssue', val, this); };
+        list.appendChild(opt);
+      }
+    }
+    if (item) {
+      const el = document.querySelector(`#sdMlIssue_list [data-value="${val}"]`);
+      sdSelect('sdMlIssue', val, el);
+    }
+  }, 50);
+}
+function openMissingLog(dateStr) {
+  // populate date display
+  const d = new Date(dateStr + 'T00:00:00');
+  const label = d.toLocaleDateString('en-GB', { weekday:'long', day:'2-digit', month:'long' });
+  document.getElementById('mlDate').textContent = label;
+  document.getElementById('mlDateVal').value = dateStr;
+  // populate searchable issue dropdown (open issues)
+  const open = (allIssues || []).filter(i => i.state === 'opened');
+  sdPopulate('sdMlIssue', open.map(i => {
+    const proj = i.references?.full?.split('#')[0] || i.web_url.split('/-/')[0].split('/').slice(-2).join('/');
+    return { value: `${i.project_id}::${i.iid}`, label: `#${i.iid} — ${i.title} (${proj})` };
+  }));
+  sdReset('sdMlIssue', '— Select an open issue —');
+  // populate searchable project dropdown
+  sdPopulate('sdMlProject', (allProjects || []).map(p => ({ value: String(p.id), label: p.name_with_namespace })));
+  sdReset('sdMlProject', '— Select a project —');
+  // reset fields
+  document.getElementById('mlDuration').value = '';
+  document.getElementById('mlDuration2').value = '';
+  document.getElementById('mlSummary').value = '';
+  document.getElementById('mlTitle').value = '';
+  document.getElementById('mlClose').checked = false;
+  mlSwitchTab(1);
+  document.getElementById('missingLogModal').classList.add('open');
+}
+function mlSwitchTab(n) {
+  document.getElementById('mlPane1').style.display = n === 1 ? 'block' : 'none';
+  document.getElementById('mlPane2').style.display = n === 2 ? 'block' : 'none';
+  document.getElementById('mlTab1').classList.toggle('active', n === 1);
+  document.getElementById('mlTab2').classList.toggle('active', n === 2);
+}
+async function submitMissingLog() {
+  const dateStr     = document.getElementById('mlDateVal').value;
+  const isNew       = document.getElementById('mlPane2').style.display !== 'none';
+  const shouldClose = document.getElementById('mlClose').checked;
+  try {
+    if (!isNew) {
+      // existing issue
+      const val     = document.getElementById('mlIssue').value;
+      const dur     = document.getElementById('mlDuration').value.trim();
+      const summary = document.getElementById('mlSummary').value.trim();
+      if (!val) return toast('Select an issue', true);
+      if (!dur) return toast('Enter a duration', true);
+      const [pid, iid] = val.split('::');
+      await logTimeGQL(pid, iid, dur, dateStr, summary);
+      if (shouldClose) await req(`/projects/${pid}/issues/${iid}`, 'PUT', { state_event: 'close' });
+      toast(`✓ Logged ${dur} on ${dateStr}${shouldClose ? ' · closed' : ''}`);
+    } else {
+      // new issue
+      const pid   = document.getElementById('mlProject').value;
+      const title = document.getElementById('mlTitle').value.trim();
+      const dur   = document.getElementById('mlDuration2').value.trim();
+      if (!pid)   return toast('Select a project', true);
+      if (!title) return toast('Enter a title', true);
+      const body  = { title };
+      if (ME) body.assignee_ids = [ME.id];
+      const issue = await req(`/projects/${pid}/issues`, 'POST', body);
+      if (dur) await logTimeGQL(pid, issue.iid, dur, dateStr, title);
+      if (shouldClose) await req(`/projects/${pid}/issues/${issue.iid}`, 'PUT', { state_event: 'close' });
+      toast(`✓ Created #${issue.iid}${dur ? ' · ' + dur + ' logged on ' + dateStr : ''}${shouldClose ? ' · closed' : ''}`);
+    }
+    closeModal('missingLogModal');
+    cacheClear();
+    loadMonthlyLog();
+  } catch(e) { toast('Error: ' + e.message, true); }
+}
+
+// ── QUICK CREATE FAB ──
+function openQuickCreate() {
+  sdPopulate('sdQcProject', (allProjects || []).map(p => ({ value: String(p.id), label: p.name_with_namespace })));
+  sdReset('sdQcProject', '— Select a project —');
+  document.getElementById('qcTitle').value = '';
+  document.getElementById('qcDesc').value = '';
+  document.getElementById('qcDuration').value = '';
+  document.getElementById('qcDate').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('qcSummary').value = '';
+  document.getElementById('qcClose').checked = false;
+  document.getElementById('quickCreateModal').classList.add('open');
+  setTimeout(() => document.getElementById('qcTitle').focus(), 100);
+}
+async function submitQuickCreate() {
+  const pid   = document.getElementById('qcProject').value;
+  const title = document.getElementById('qcTitle').value.trim();
+  const dur     = document.getElementById('qcDuration').value.trim();
+  const date    = document.getElementById('qcDate').value;
+  const summary = document.getElementById('qcSummary').value.trim();
+  const shouldClose = document.getElementById('qcClose').checked;
+  if (!pid)   return toast('Select a project', true);
+  if (!title) return toast('Enter a title', true);
+  const desc = document.getElementById('qcDesc').value.trim();
+  try {
+    const body = { title };
+    if (desc) body.description = desc;
+    if (ME) body.assignee_ids = [ME.id];
+    const issue = await req(`/projects/${pid}/issues`, 'POST', body);
+    if (dur) await logTimeGQL(pid, issue.iid, dur, date, summary || title);
+    if (shouldClose) await req(`/projects/${pid}/issues/${issue.iid}`, 'PUT', { state_event: 'close' });
+    toast(`✓ #${issue.iid} created${dur ? ' · ' + dur + ' logged on ' + date : ''}${shouldClose ? ' · closed' : ''}`);
+    closeModal('quickCreateModal');
+    cacheClear();
+    loadDashboard();
+  } catch(e) { toast('Error: ' + e.message, true); }
+}
+
+// ── QUICK LOG FAB ──
+function openQuickLog() {
+  const sel = document.getElementById('quickIssue');
+  const open = allIssues.filter(i => i.state === 'opened');
+  sel.innerHTML = '<option value="">— Select an open issue —</option>' +
+    open.map(i => {
+      const proj = i.references?.full?.split('#')[0] || i.web_url.split('/-/')[0].split('/').slice(-2).join('/');
+      return `<option value="${i.project_id}::${i.iid}">#${i.iid} — ${i.title} (${proj})</option>`;
+    }).join('');
+  document.getElementById('quickDuration').value = '';
+  document.getElementById('quickDate').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('quickSummary').value = '';
+  document.getElementById('quickClose').checked = false;
+  document.getElementById('quickLogModal').classList.add('open');
+  setTimeout(() => document.getElementById('quickDuration').focus(), 100);
+}
+async function submitQuickLog() {
+  const val     = document.getElementById('quickIssue').value;
+  const dur     = document.getElementById('quickDuration').value.trim();
+  const date    = document.getElementById('quickDate').value;
+  const summary = document.getElementById('quickSummary').value.trim();
+  if (!val) return toast('Select an issue', true);
+  if (!dur) return toast('Enter a duration', true);
+  const [pid, iid] = val.split('::');
+  const shouldClose = document.getElementById('quickClose').checked;
+  try {
+    await logTimeGQL(pid, iid, dur, date, summary);
+    if (shouldClose) {
+      await req(`/projects/${pid}/issues/${iid}`, 'PUT', { state_event: 'close' });
+      toast(`✓ Logged ${dur} on ${date} · issue closed`);
+    } else {
+      toast(`✓ Logged ${dur} on ${date}${summary ? ' · summary added' : ''}`);
+    }
+    closeModal('quickLogModal');
+    cacheClear();
+    loadDashboard();
+  } catch(e) { toast('Error: ' + e.message, true); }
+}
+
+// ── TIME MODAL ──
+function openTimeModal(pid, iid, title) {
+  activeProjectId = pid; activeIssueIid = iid;
+  document.getElementById('timeModalIssue').textContent = `#${iid} — ${title}`;
+  document.getElementById('timeInput').value = '';
+  document.getElementById('timeDate').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('timeSummaryInput').value = '';
+  document.getElementById('timeModal').classList.add('open');
+  setTimeout(() => document.getElementById('timeInput').focus(), 100);
+}
+async function submitTime() {
+  const duration = document.getElementById('timeInput').value.trim();
+  if (!duration) return toast('Enter a duration', true);
+  try {
+    const _tDate = document.getElementById('timeDate')?.value || new Date().toISOString().slice(0,10);
+    const _tSum = document.getElementById('timeSummaryInput')?.value.trim() || '';
+    await logTimeGQL(activeProjectId, activeIssueIid, duration, _tDate, _tSum);
+    toast('✓ Logged ' + duration + ' on ' + _tDate);
+    document.getElementById('timeInput').value = '';
+    document.getElementById('timeSummaryInput').value = '';
+    closeModal('timeModal');
+    cacheClear();
+    loadMyIssues();
+    loadDashboard();
+  } catch(e) { toast('Error: ' + e.message, true); }
+}
+
+// ── CLOSE MODAL ──
+function openCloseModal(pid, iid) {
+  activeProjectId = pid; activeIssueIid = iid;
+  document.getElementById('closeTimeInput').value = '';
+  document.getElementById('closeDate').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('closeModal').classList.add('open');
+}
+async function confirmClose() {
+  const t    = document.getElementById('closeTimeInput').value.trim();
+  const date = document.getElementById('closeDate').value || new Date().toISOString().slice(0, 10);
+  try {
+    if (t) await logTimeGQL(activeProjectId, activeIssueIid, t, date, '');
+    await req(`/projects/${activeProjectId}/issues/${activeIssueIid}`, 'PUT', { state_event: 'close' });
+    toast('✓ Issue closed');
+    closeModal('closeModal');
+    cacheClear();
+    loadMyIssues();
+    loadDashboard();
+  } catch(e) { toast('Error: ' + e.message, true); }
+}
+
+// ── NEW LOG ENTRY PAGE ──
+function nleSwitchTab(n) {
+  document.getElementById('nlePane1').style.display = n === 1 ? 'block' : 'none';
+  document.getElementById('nlePane2').style.display = n === 2 ? 'block' : 'none';
+  document.getElementById('nleTab1').classList.toggle('active', n === 1);
+  document.getElementById('nleTab2').classList.toggle('active', n === 2);
+  if (n === 2) initBulkMode();
+}
+
+// ── BULK ENTRY ──
+let _bulkRowCount = 0;
+function initBulkMode() {
+  sdPopulate('sdBulkProject', (allProjects || []).map(p => ({ value: String(p.id), label: p.name_with_namespace })));
+  if (document.getElementById('bulkRowList').children.length === 0) {
+    addBulkRow(); addBulkRow();
+  }
+}
+function addBulkRow() {
+  _bulkRowCount++;
+  const id = 'br_' + _bulkRowCount;
+  const num = document.getElementById('bulkRowList').children.length + 1;
+  const today = new Date().toISOString().slice(0, 10);
+  const meName = ME ? (ME.name || ME.username) : 'Me';
+  const div = document.createElement('div');
+  div.className = 'bulk-card';
+  div.id = id;
+  div.innerHTML = `
+    <div class="bulk-card-head">
+      <span class="bulk-row-num">${num}</span>
+      <input type="text" class="form-input" placeholder="Issue title… *" id="${id}_title" style="font-size:14px;font-weight:600">
+      <span id="${id}_badge"></span>
+      <button class="bulk-remove-btn" onclick="removeBulkRow('${id}')">✕ Remove</button>
+    </div>
+    <div class="bulk-card-body">
+      <div class="form-group">
+        <label class="form-label">Description <span style="color:var(--text3);font-weight:400">(optional)</span></label>
+        <textarea class="form-input" id="${id}_desc" placeholder="Steps, context, links…"></textarea>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="form-group" style="margin:0">
+            <label class="form-label">Time Spent</label>
+            <input type="text" class="form-input" placeholder="2h / 1h30m / 45m" id="${id}_dur">
+          </div>
+          <div class="form-group" style="margin:0">
+            <label class="form-label">Date</label>
+            <input type="date" class="form-input" id="${id}_date" value="${today}">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Work Summary <span style="color:var(--text3);font-weight:400">(optional)</span></label>
+          <input type="text" class="form-input" placeholder="What did you work on?" id="${id}_summary">
+        </div>
+      </div>
+    </div>
+    <div class="bulk-card-foot">
+      <label class="bulk-check-item">
+        <input type="checkbox" id="${id}_assign" checked style="accent-color:var(--blue)">
+        <span>Assign to ${meName}</span>
+      </label>
+      <label class="bulk-check-item">
+        <input type="checkbox" id="${id}_close" style="accent-color:var(--red)">
+        <span style="color:var(--red)">Close after creating</span>
+      </label>
+    </div>`;
+  document.getElementById('bulkRowList').appendChild(div);
+}
+function removeBulkRow(id) {
+  const el = document.getElementById(id);
+  if (el) el.remove();
+  if (document.getElementById('bulkRowList').children.length === 0) addBulkRow();
+}
+function resetBulkForm() {
+  document.getElementById('bulkRowList').innerHTML = '';
+  _bulkRowCount = 0;
+  sdReset('sdBulkProject', '— Select a project —');
+  addBulkRow(); addBulkRow();
+}
+async function submitBulk() {
+  const pid = document.getElementById('bulkProject').value;
+  if (!pid) return toast('Select a project', true);
+  const rows = document.querySelectorAll('#bulkRowList .bulk-card');
+  let submitted = 0, failed = 0;
+  for (const row of rows) {
+    const id      = row.id;
+    const title   = document.getElementById(id + '_title').value.trim();
+    const desc    = document.getElementById(id + '_desc').value.trim();
+    const dur     = document.getElementById(id + '_dur').value.trim();
+    const durDate = document.getElementById(id + '_date')?.value || new Date().toISOString().slice(0, 10);
+    const summary = document.getElementById(id + '_summary').value.trim();
+    const assign  = document.getElementById(id + '_assign').checked;
+    const close   = document.getElementById(id + '_close').checked;
+    if (!title) continue;
+    const badge = document.getElementById(id + '_badge');
+    try {
+      const body = { title };
+      if (desc) body.description = desc;
+      if (assign && ME) body.assignee_ids = [ME.id];
+      const issue = await req(`/projects/${pid}/issues`, 'POST', body);
+      if (dur) await logTimeGQL(pid, issue.iid, dur, durDate, summary || title);
+      if (close) await req(`/projects/${pid}/issues/${issue.iid}`, 'PUT', { state_event: 'close' });
+      row.style.opacity = '0.55';
+      row.style.pointerEvents = 'none';
+      row.style.borderColor = 'var(--green)';
+      badge.innerHTML = `<span class="bulk-status ok">✓ #${issue.iid}${close?' · closed':''}</span>`;
+      submitted++;
+    } catch(e) {
+      row.style.borderColor = 'var(--red)';
+      badge.innerHTML = `<span class="bulk-status err">✕ Failed</span>`;
+      failed++;
+    }
+  }
+  if (submitted === 0 && failed === 0) return toast('No rows to submit — add titles first', true);
+  toast(`✓ ${submitted} issue${submitted!==1?'s':''} created${failed?' · '+failed+' failed':''}`);
+  cacheClear();
+  if (failed === 0) setTimeout(() => resetBulkForm(), 2000);
+}
+
+let _assignMe = true;
+
+function initCreatePage() {
+  if (ME) {
+    const initial = (ME.name || ME.username || '?')[0].toUpperCase();
+    document.getElementById('assigneeAvatar').textContent = initial;
+    document.getElementById('assigneeName').textContent = ME.name || ME.username;
+  }
+  if (document.getElementById('timeEntryList').children.length === 0) addTimeRow();
+  updateTimeSummary();
+}
+
+function toggleAssignee() {
+  _assignMe = !_assignMe;
+  document.getElementById('assigneeMe').style.opacity = _assignMe ? '1' : '0.4';
+  document.getElementById('assigneeToggle').textContent = _assignMe ? '✕ Remove' : '+ Assign me';
+}
+
+let _rowCount = 0;
+function addTimeRow() {
+  _rowCount++;
+  const id = 'ter_' + _rowCount;
+  const today = new Date().toISOString().slice(0, 10);
+  const div = document.createElement('div');
+  div.className = 'time-entry-row';
+  div.id = id;
+  div.innerHTML = `
+    <input type="text" placeholder="2h30m / 1h" oninput="updateTimeSummary()" class="ter-dur" id="${id}_dur">
+    <input type="date" class="ter-date" id="${id}_date" value="${today}">
+    <input type="text" placeholder="What did you work on? (optional)" id="${id}_summary">
+    <button class="ter-remove" onclick="removeTimeRow('${id}')" title="Remove">×</button>`;
+  document.getElementById('timeEntryList').appendChild(div);
+  div.querySelector('.ter-dur').focus();
+  updateTimeSummary();
+}
+
+function removeTimeRow(id) {
+  const el = document.getElementById(id);
+  if (el) el.remove();
+  updateTimeSummary();
+  if (document.getElementById('timeEntryList').children.length === 0) addTimeRow();
+}
+
+function parseSecsFromStr(s) {
+  if (!s) return 0;
+  let secs = 0;
+  const d = s.match(/(\d+(?:\.\d+)?)d/i); if (d) secs += parseFloat(d[1]) * 8 * 3600;
+  const h = s.match(/(\d+(?:\.\d+)?)h/i); if (h) secs += parseFloat(h[1]) * 3600;
+  const m = s.match(/(\d+)m/i);           if (m) secs += parseInt(m[1]) * 60;
+  return secs;
+}
+
+function updateTimeSummary() {
+  const rows = document.querySelectorAll('.ter-dur');
+  let total = 0;
+  rows.forEach(r => { total += parseSecsFromStr(r.value.trim()); });
+  const sumEl = document.getElementById('timeSummary');
+  const valEl = document.getElementById('timeSummaryVal');
+  const closeOpt = document.getElementById('nleCloseOpt');
+  if (total > 0) {
+    const h = Math.floor(total / 3600), m = Math.floor((total % 3600) / 60);
+    valEl.textContent = m > 0 ? `${h}h ${m}m` : `${h}h`;
+    sumEl.style.display = 'flex';
+    if (closeOpt) closeOpt.style.display = 'block';
+  } else {
+    sumEl.style.display = 'none';
+    if (closeOpt) closeOpt.style.display = 'none';
+  }
+}
+
+function resetCreateForm() {
+  document.getElementById('createProject').value = '';
+  // reset searchable dropdown display
+  const lbl = document.getElementById('sdProject_label');
+  if (lbl) { lbl.textContent = '— Select a project —'; lbl.className = 'sd-placeholder'; }
+  document.querySelectorAll('#sdProject_list .sd-opt').forEach(o => o.classList.remove('selected'));
+  document.getElementById('createTitle').value = '';
+  document.getElementById('createDesc').value = '';
+  document.getElementById('timeEntryList').innerHTML = '';
+  const cb = document.getElementById('createAndClose'); if (cb) cb.checked = false;
+  document.getElementById('nleCloseOpt').style.display = 'none';
+  document.getElementById('timeSummary').style.display = 'none';
+  _rowCount = 0;
+  _assignMe = true;
+  document.getElementById('assigneeMe').style.opacity = '1';
+  document.getElementById('assigneeToggle').textContent = '✕ Remove';
+  addTimeRow();
+}
+
+async function createIssue() {
+  const pid   = document.getElementById('createProject').value;
+  const title = document.getElementById('createTitle').value.trim();
+  const desc  = document.getElementById('createDesc').value.trim();
+  const shouldClose = document.getElementById('createAndClose')?.checked;
+  if (!pid)   return toast('Select a project', true);
+  if (!title) return toast('Enter a title', true);
+  const body = { title, description: desc };
+  if (_assignMe && ME) body.assignee_ids = [ME.id];
+  try {
+    const issue = await req(`/projects/${pid}/issues`, 'POST', body);
+    // log time entries sequentially
+    const rows = document.querySelectorAll('#timeEntryList .time-entry-row');
+    let loggedAny = false;
+    for (const row of rows) {
+      const dur     = row.querySelector('.ter-dur').value.trim();
+      const date    = row.querySelector('input[type="date"]').value;
+      const summary = row.querySelector('input[type="text"]:not(.ter-dur)').value.trim();
+      if (!dur) continue;
+      await logTimeGQL(pid, issue.iid, dur, date, summary);
+      // summary passed via GraphQL timelogCreate
+      loggedAny = true;
+    }
+    // close if requested
+    if (shouldClose) {
+      await req(`/projects/${pid}/issues/${issue.iid}`, 'PUT', { state_event: 'close' });
+      toast(`✓ Created #${issue.iid}${loggedAny?' · time logged':''} · closed`);
+    } else {
+      toast(`✓ Created #${issue.iid}${loggedAny?' · time logged':''}`);
+    }
+    resetCreateForm();
+    cacheClear();
+    showPage('issues'); loadMyIssues();
+  } catch(e) { toast('Error: ' + e.message, true); }
+}
+
+// ── SHARED TIME HELPERS ──
+function parseTimeNote(body) {
+  const m = body.match(/added (.+?) of time spent at (\d{4}-\d{2}-\d{2})/);
+  if (!m) return null;
+  let secs = 0; const t = m[1];
+  const mo = t.match(/(\d+)mo/); if (mo) secs += +mo[1] * 4 * 5 * 8 * 3600; // 1mo = 4w
+  const w  = t.match(/(\d+)w/);  if (w)  secs += +w[1]  * 5 * 8 * 3600;
+  const d  = t.match(/(\d+)d/);  if (d)  secs += +d[1]  * 8 * 3600;
+  const h  = t.match(/(\d+)h/);  if (h)  secs += +h[1]  * 3600;
+  const mi = t.match(/(\d+)m(?!o)/); if (mi) secs += +mi[1] * 60;
+  return { dateStr: m[2], secs };
+}
+async function fetchTimeNotes(issue) {
+  try {
+    const notes = await reqAll(`/projects/${issue.project_id}/issues/${issue.iid}/notes`);
+    const proj  = issue.references?.full?.split('#')[0] || issue.web_url.split('/-/')[0].split('/').slice(-2).join('/');
+    return { issue, proj, notes: notes.filter(n => n.body?.includes('time spent')) };
+  } catch { return { issue, proj: '', notes: [] }; }
+}
+function getSatNum(d, year, month) {
+  // returns which Saturday number (1-4) the given date is, or 0 if not Saturday
+  const dateObj = new Date(year, month, d);
+  if (dateObj.getDay() !== 6) return 0;
+  let cnt = 0;
+  for (let x = 1; x <= d; x++) if (new Date(year, month, x).getDay() === 6) cnt++;
+  return cnt;
+}
+function isWeekend(dateObj, d, year, month) {
+  const day = dateObj.getDay();
+  if (day === 5) return true; // Friday always off
+  if (day === 6) {
+    const satNum = getSatNum(d, year, month);
+    return getSatOff().includes(satNum); // off if user marked it off
+  }
+  return false;
+}
+
+// ── MONTHLY LOG ──
+async function loadMonthlyLog() {
+  if (!ME) return;
+  document.getElementById('logTable').innerHTML = '<div class="loading"><span class="spinner"></span>Loading…</div>';
+  const now = new Date();
+  const year = now.getFullYear(), month = now.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const todayDate = now.getDate();
+
+  try {
+    const dayMap = await buildDayMap(); // shared — same data as dashboard
+
+    let totalSecs = 0, worked = 0, missing = 0, rows = '';
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateObj = new Date(year, month, d);
+      const wkend   = isWeekend(dateObj, d, year, month);
+      const future  = d > todayDate;
+      const today   = d === todayDate;
+      if (future) continue;
+      const key      = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const entries  = dayMap[key] || [];
+      const daySecs  = entries.reduce((s, e) => s + e.secs, 0);
+      const dateFmt  = dateObj.toLocaleDateString('en-GB', { weekday:'short', day:'2-digit', month:'short' });
+
+      if (entries.length === 0) {
+        if (wkend) rows += `<tr class="lweekend"><td class="ldate">${dateFmt}</td><td colspan="2" style="color:var(--text3);font-style:italic">Weekend</td><td></td><td></td></tr>`;
+        else { missing++; rows += `<tr class="lmissing"><td class="ldate">${dateFmt}</td><td colspan="2"><span style="color:var(--red);font-style:italic">— missing —</span></td><td></td><td style="text-align:right;white-space:nowrap"><button class="log-missing-btn" onclick="openMissingLog('${key}')">+ Log Time</button></td></tr>`; }
+      } else {
+        totalSecs += daySecs;
+        worked++;
+        // target: working Saturday = 7h, other workdays = 8h, off day = no target
+        const satNum     = getSatNum(d, year, month);
+        const isWorkSat  = satNum > 0 && !getSatOff().includes(satNum);
+        const targetSecs = wkend ? 0 : (isWorkSat ? (CFG.sat_hours ?? 7)*3600 : (CFG.day_hours ?? 8)*3600);
+        const shortfall   = targetSecs > 0 && daySecs < targetSecs;
+        const overtime    = targetSecs > 0 && daySecs > targetSecs;
+        const deficit     = shortfall ? targetSecs - daySecs : 0;
+        const extra       = overtime  ? daySecs - targetSecs : 0;
+        const fmtDef = s => { const h=Math.floor(s/3600),m=Math.floor((s%3600)/60); return h>0?(m>0?`${h}h ${m}m`:`${h}h`):`${m}m`; };
+        const timeBadge   = shortfall
+          ? `<span class="lshort" title="Target: ${fmtH(targetSecs)} | Short by ${fmtDef(deficit)}">▾ ${fmtDef(deficit)} short</span>`
+          : overtime
+            ? `<span class="lover" title="Target: ${fmtH(targetSecs)} | Extra: ${fmtDef(extra)}">▴ ${fmtDef(extra)} extra</span>`
+            : `<span class="lok">✓</span>`;
+        const cls = today ? 'ldata ltoday' : 'ldata';
+        entries.forEach((e, idx) => {
+          const dc = idx === 0 ? `<td class="ldate" rowspan="${entries.length}">${dateFmt}</td>` : '';
+          const ac = idx === 0 ? `<td rowspan="${entries.length}" style="text-align:right;white-space:nowrap;vertical-align:middle"><button class="log-missing-btn" onclick="openMissingLogOnIssue('${key}','${e.project_id}','${e.iid}')">+ Log Time</button></td>` : '';
+          // single entry: show total+badge in time cell; multi entry: show per-entry time, total in DAY TOTAL row
+          const timeTd = entries.length === 1
+            ? `<td class="ltime" style="white-space:nowrap">${fmtH(daySecs)} ${timeBadge}</td>`
+            : `<td style="color:var(--text3);font-size:13px;text-align:right">${fmtH(e.secs)}</td>`;
+          rows += `<tr class="${cls}">${dc}<td style="color:var(--text3);font-size:13px">${e.proj}</td><td><a class="llink" href="${e.url}" target="_blank">#${e.iid}</a> <span style="color:var(--text)">${e.title}</span></td>${timeTd}${ac}</tr>`;
+        });
+        if (entries.length > 1) rows += `<tr class="ldaytotal"><td></td><td></td><td style="color:var(--text3);font-size:12px;font-weight:700;text-align:right">DAY TOTAL</td><td class="ltime" style="white-space:nowrap">${fmtH(daySecs)} ${timeBadge}</td><td></td></tr>`;
+      }
+    }
+
+    document.getElementById('logTable').innerHTML = `
+      <div class="log-bar">
+        <div class="log-bar-item"><div class="log-bar-label">Total Hours</div><div class="log-bar-value" style="color:var(--blue)">${fmtH(totalSecs)}</div></div>
+        <div class="log-bar-item"><div class="log-bar-label">Days Worked</div><div class="log-bar-value" style="color:var(--green)">${worked}</div></div>
+        <div class="log-bar-item"><div class="log-bar-label">Missing Days</div><div class="log-bar-value" style="color:${missing>0?'var(--red)':'var(--green)'}">${missing}</div></div>
+      </div>
+      <div class="table-card">
+        <table class="ltable">
+          <thead><tr><th>Date</th><th>Project</th><th>Issue</th><th style="text-align:right">Time</th><th></th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+    sc('render_log', document.getElementById('logTable').innerHTML);
+  } catch(e) {
+    document.getElementById('logTable').innerHTML = `<div class="empty"><div class="eicon">⚠️</div><p>${e.message}</p></div>`;
+  }
+}
+
+// ── TIME REPORT ──
+async function loadTimeReport() {
+  if (!ME) return;
+  document.getElementById('timeList').innerHTML = '<div class="loading"><span class="spinner"></span>Loading…</div>';
+  const now = new Date();
+  const year = now.getFullYear(), month = now.getMonth();
+  const monthStart = new Date(year, month, 1).toISOString();
+  const monthEnd   = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
+  try {
+    const issues  = await reqAll(`/issues?assignee_username=${ME.username}&state=all&scope=all&updated_after=${monthStart}&updated_before=${monthEnd}`);
+    document.getElementById('timeList').innerHTML = '<div class="loading"><span class="spinner"></span>Parsing notes…</div>';
+    const results = await Promise.all(issues.map(fetchTimeNotes));
+    const map = {};
+    for (const { issue, proj, notes } of results) {
+      const key = `${issue.project_id}-${issue.iid}`;
+      for (const note of notes) {
+        const p = parseTimeNote(note.body);
+        if (!p) continue;
+        const [ny, nm] = p.dateStr.split('-').map(Number);
+        if (ny !== year || nm !== month + 1) continue;
+        if (!map[key]) map[key] = { issue, proj, secs: 0, last: p.dateStr };
+        map[key].secs += p.secs;
+        if (p.dateStr > map[key].last) map[key].last = p.dateStr;
+      }
+    }
+    let totalAll = gc('totalAll');
+    if (totalAll === null) {
+      const allI = await reqAll(`/issues?assignee_username=${ME.username}&state=all&scope=all`);
+      totalAll = allI.reduce((s, i) => s + (i.time_stats?.total_time_spent || 0), 0);
+      sc('totalAll', totalAll);
+    }
+
+    // Group by project
+    const projMap = {};
+    for (const { proj, secs } of Object.values(map)) {
+      if (!projMap[proj]) projMap[proj] = 0;
+      projMap[proj] += secs;
+    }
+    const projEntries = Object.entries(projMap).sort((a, b) => b[1] - a[1]);
+    const monthSec = projEntries.reduce((s, [, v]) => s + v, 0);
+
+    document.getElementById('statMonth').textContent  = fmtH(monthSec);
+    document.getElementById('statIssues').textContent = projEntries.length;
+    document.getElementById('statTotal').textContent  = fmtH(totalAll);
+    sc('stat_month', fmtH(monthSec));
+    sc('stat_issues', String(projEntries.length));
+    sc('stat_total', fmtH(totalAll));
+
+    if (!projEntries.length) {
+      document.getElementById('timeList').innerHTML = '<div class="empty"><div class="eicon">📅</div><p>No time logged this month</p></div>';
+      return;
+    }
+    const maxProjSec = projEntries[0][1];
+    document.getElementById('timeList').innerHTML = `
+      <div class="table-card">
+      <table class="dtable">
+        <thead><tr><th>Project</th><th>Hours This Month</th><th style="width:40%"></th></tr></thead>
+        <tbody>${projEntries.map(([proj, secs]) => {
+          const pct = Math.round((secs / maxProjSec) * 100);
+          return `<tr>
+            <td style="font-weight:600;color:var(--text)">${proj}</td>
+            <td style="color:var(--purple);font-weight:800;font-size:16px;white-space:nowrap">${fmtH(secs)}</td>
+            <td>
+              <div style="height:8px;background:var(--surface2);border-radius:4px;overflow:hidden">
+                <div style="height:100%;width:${pct}%;background:var(--blue);border-radius:4px;transition:width .4s"></div>
+              </div>
+            </td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table></div>`;
+    sc('render_time', document.getElementById('timeList').innerHTML);
+  } catch(e) {
+    document.getElementById('timeList').innerHTML = `<div class="empty"><div class="eicon">⚠️</div><p>${e.message}</p></div>`;
+  }
+}
+
+// ── UTILS ──
+function loadTimeReportIfNeeded() {
+  const html = gc('render_time');
+  if (html) {
+    document.getElementById('statMonth').textContent  = gc('stat_month')  || '—';
+    document.getElementById('statIssues').textContent = gc('stat_issues') || '—';
+    document.getElementById('statTotal').textContent  = gc('stat_total')  || '—';
+    document.getElementById('timeList').innerHTML = html;
+  } else {
+    loadTimeReport();
+  }
+}
+function loadMonthlyLogIfNeeded() {
+  const html = gc('render_log');
+  if (html) {
+    document.getElementById('logTable').innerHTML = html;
+  } else {
+    loadMonthlyLog();
+  }
+}
+
+function fmtH(s) {
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60);
+  return h > 0 ? (m > 0 ? `${h}h ${m}m` : `${h}h`) : (m > 0 ? `${m}m` : '0m');
+}
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.getElementById('nav-' + name).classList.add('active');
+  if (name === 'time')    { updateLabels(); loadTimeReportIfNeeded(); }
+  if (name === 'log')     { updateLabels(); loadMonthlyLogIfNeeded(); }
+  if (name === 'issues')  loadMyIssues();
+  if (name === 'dashboard') loadDashboard();
+  document.getElementById('fabGroup').style.display = name === 'dashboard' ? 'flex' : 'none';
+  if (name === 'create')  initCreatePage();
+}
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function toast(msg, err=false) {
+  const t = document.createElement('div');
+  t.className = 'toast' + (err ? ' error' : '');
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
+});
+// ── SETTINGS ──
+function openSettings() {
+  document.getElementById('cfgUrl').value   = CFG.url   || DEFAULT_URL;
+  document.getElementById('cfgToken').value = CFG.token || '';
+  const off = getSatOff();
+  [1,2,3,4].forEach(n => { document.getElementById('sat'+n+'off').checked = off.includes(n); });
+  document.getElementById('cfgSatHours').value = CFG.sat_hours ?? 7;
+  document.getElementById('cfgDayHours').value = CFG.day_hours ?? 8;
+  document.getElementById('settingsModal').classList.add('open');
+  setTimeout(() => document.getElementById(CFG.token ? 'cfgUrl' : 'cfgToken').focus(), 100);
+}
+async function saveSettings() {
+  const url   = document.getElementById('cfgUrl').value.trim();
+  const token = document.getElementById('cfgToken').value.trim();
+  if (!token) return toast('Token is required', true);
+  const sat_off   = [1,2,3,4].filter(n => document.getElementById('sat'+n+'off').checked);
+  const sat_hours = parseInt(document.getElementById('cfgSatHours').value) || 7;
+  const day_hours = parseInt(document.getElementById('cfgDayHours').value) || 8;
+  saveCfg({ url: url || DEFAULT_URL, token, sat_off, sat_hours, day_hours });
+  API   = (CFG.url || DEFAULT_URL).replace(/\/$/, '') + '/api/v4';
+  TOKEN = CFG.token;
+  closeModal('settingsModal');
+  cacheClear();
+  ME = null; allIssues = []; allProjects = [];
+  document.getElementById('userInfo').innerHTML = '<span class="user-pill-name">Connecting…</span>';
+  await connect();
+}
+
+document.addEventListener('keydown', e => {
+  const active = document.querySelector('.modal-overlay.open');
+  if (active) { if (e.key === 'Escape') active.classList.remove('open'); return; }
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+  if (e.key === 'n' || e.key === 'N') openQuickCreate();
+  if (e.key === 'l' || e.key === 'L') openQuickLog();
+  if (e.key === 's' || e.key === 'S') openSettings();
+});
+window.onload = () => {
+  cacheClear();
+  if (!CFG.token) { openSettings(); }
+  else connect();
+};
+</script>
+</body>
+</html>
+
+
