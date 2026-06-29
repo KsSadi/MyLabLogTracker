@@ -671,15 +671,18 @@ select.form-input { cursor: pointer; }
     <div class="page" id="page-time">
       <div class="page-hd">
         <h2>Time Report</h2>
-        <span class="month-tag" id="timeMonthLabel"></span>
+        <div style="display:flex;align-items:center;gap:6px">
+          <button class="btn btn-ghost btn-sm" onclick="changeTimeMonth(-1)" style="padding:2px 8px;font-size:16px">‹</button>
+          <span class="month-tag" id="timeMonthLabel" style="min-width:110px;text-align:center"></span>
+          <button class="btn btn-ghost btn-sm" id="timeNextBtn" onclick="changeTimeMonth(1)" style="padding:2px 8px;font-size:16px">›</button>
+        </div>
         <div class="page-hd-right">
           <button class="btn btn-ghost btn-sm" onclick="cacheClear();loadTimeReport()">… Refresh</button>
         </div>
       </div>
       <div class="stats-row">
-        <div class="stat-box">   <div class="stat-label">This Month</div>  <div class="stat-value" style="color:var(--blue)"   id="statMonth">—</div><div class="stat-sub">hours spent</div></div>
+        <div class="stat-box">   <div class="stat-label">Hours Logged</div>  <div class="stat-value" style="color:var(--blue)"   id="statMonth">—</div><div class="stat-sub">this month</div></div>
         <div class="stat-box g"><div class="stat-label">Projects</div><div class="stat-value" style="color:var(--green)"  id="statIssues">—</div><div class="stat-sub">with time logged</div></div>
-        <div class="stat-box p"><div class="stat-label">All Time Total</div><div class="stat-value" style="color:var(--purple)" id="statTotal">—</div><div class="stat-sub">all my issues</div></div>
       </div>
       <div class="section-label">Breakdown by Project</div>
       <div id="timeList"><div class="empty"><div class="eicon">⏱</div><p>Loading…</p></div></div>
@@ -689,7 +692,11 @@ select.form-input { cursor: pointer; }
     <div class="page" id="page-log">
       <div class="page-hd">
         <h2>Monthly Log</h2>
-        <span class="month-tag" id="logMonthLabel"></span>
+        <div style="display:flex;align-items:center;gap:6px">
+          <button class="btn btn-ghost btn-sm" onclick="changeLogMonth(-1)" style="padding:2px 8px;font-size:16px">‹</button>
+          <span class="month-tag" id="logMonthLabel" style="min-width:110px;text-align:center"></span>
+          <button class="btn btn-ghost btn-sm" id="logNextBtn" onclick="changeLogMonth(1)" style="padding:2px 8px;font-size:16px">›</button>
+        </div>
         <div class="page-hd-right">
           <button class="btn btn-ghost btn-sm" onclick="cacheClear();loadMonthlyLog()">… Refresh</button>
         </div>
@@ -1177,10 +1184,16 @@ document.addEventListener('click', e => {
 
 // ── LABELS ──
 function updateLabels() {
+  updateTimeLabel();
+  updateLogLabel();
+}
+function updateLogLabel() {
+  const d = new Date(_logYear, _logMonth, 1);
   const now = new Date();
-  const label = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-  document.getElementById('timeMonthLabel').textContent = label;
+  const label = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   document.getElementById('logMonthLabel').textContent = label;
+  document.getElementById('logNextBtn').style.visibility =
+    (_logYear === now.getFullYear() && _logMonth === now.getMonth()) ? 'hidden' : 'visible';
 }
 
 // ── DASHBOARD ──
@@ -1244,15 +1257,18 @@ async function fetchIssueTimelogs(issue) {
   return [];
 }
 
-async function buildDayMap() {
-  const hit = gc('daymap');
+async function buildDayMap(year, month) {
+  const now = new Date();
+  if (year === undefined)  year  = now.getFullYear();
+  if (month === undefined) month = now.getMonth();
+  const cacheKey = `daymap_${year}_${month}`;
+  const hit = gc(cacheKey);
   if (hit) return hit;
 
-  const now = new Date();
-  const year = now.getFullYear(), month = now.getMonth();
+  // Fetch issues updated on or after the start of the target month.
+  // This catches current-month issues and past-month issues that were later updated.
   const monthStart = new Date(year, month, 1).toISOString();
-  const monthEnd   = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
-  const issues = await reqAll(`/issues?assignee_username=${ME.username}&state=all&scope=all&updated_after=${monthStart}&updated_before=${monthEnd}`);
+  const issues = await reqAll(`/issues?assignee_username=${ME.username}&state=all&scope=all&updated_after=${monthStart}`);
 
   // Fetch both notes and per-issue timelogs in parallel
   const results = await Promise.all(issues.map(async (issue) => {
@@ -1299,7 +1315,7 @@ async function buildDayMap() {
     }
   }
 
-  sc('daymap', dayMap);
+  sc(cacheKey, dayMap);
   return dayMap;
 }
 
@@ -1914,16 +1930,32 @@ function isWeekend(dateObj, d, year, month) {
 }
 
 // ── MONTHLY LOG ──
+const _logNow = new Date();
+let _logYear = _logNow.getFullYear();
+let _logMonth = _logNow.getMonth();
+
+function changeLogMonth(delta) {
+  _logMonth += delta;
+  if (_logMonth > 11) { _logMonth = 0; _logYear++; }
+  if (_logMonth < 0)  { _logMonth = 11; _logYear--; }
+  // hide next button if we're already on current month
+  const now = new Date();
+  document.getElementById('logNextBtn').style.visibility =
+    (_logYear === now.getFullYear() && _logMonth === now.getMonth()) ? 'hidden' : 'visible';
+  cacheClear();
+  loadMonthlyLog();
+}
+
 async function loadMonthlyLog() {
   if (!ME) return;
   document.getElementById('logTable').innerHTML = '<div class="loading"><span class="spinner"></span>Loading…</div>';
   const now = new Date();
-  const year = now.getFullYear(), month = now.getMonth();
+  const year = _logYear, month = _logMonth;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const todayDate = now.getDate();
+  const todayDate = (year === now.getFullYear() && month === now.getMonth()) ? now.getDate() : daysInMonth;
 
   try {
-    const dayMap = await buildDayMap(); // shared — same data as dashboard
+    const dayMap = await buildDayMap(_logYear, _logMonth); // use selected month
 
     let totalSecs = 0, worked = 0, missing = 0, rows = '';
     for (let d = 1; d <= daysInMonth; d++) {
@@ -1984,21 +2016,43 @@ async function loadMonthlyLog() {
         </table>
       </div>`;
     sc('render_log', document.getElementById('logTable').innerHTML);
+    updateLogLabel();
   } catch(e) {
     document.getElementById('logTable').innerHTML = `<div class="empty"><div class="eicon">⚠️</div><p>${e.message}</p></div>`;
   }
 }
 
 // ── TIME REPORT ──
+const _timeNow = new Date();
+let _timeYear  = _timeNow.getFullYear();
+let _timeMonth = _timeNow.getMonth();
+
+function changeTimeMonth(delta) {
+  _timeMonth += delta;
+  if (_timeMonth > 11) { _timeMonth = 0; _timeYear++; }
+  if (_timeMonth < 0)  { _timeMonth = 11; _timeYear--; }
+  const now = new Date();
+  document.getElementById('timeNextBtn').style.visibility =
+    (_timeYear === now.getFullYear() && _timeMonth === now.getMonth()) ? 'hidden' : 'visible';
+  cacheClear();
+  loadTimeReport();
+}
+
+function updateTimeLabel() {
+  const d = new Date(_timeYear, _timeMonth, 1);
+  const now = new Date();
+  document.getElementById('timeMonthLabel').textContent = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  document.getElementById('timeNextBtn').style.visibility =
+    (_timeYear === now.getFullYear() && _timeMonth === now.getMonth()) ? 'hidden' : 'visible';
+}
+
 async function loadTimeReport() {
   if (!ME) return;
   document.getElementById('timeList').innerHTML = '<div class="loading"><span class="spinner"></span>Loading…</div>';
-  const now = new Date();
-  const year = now.getFullYear(), month = now.getMonth();
+  const year = _timeYear, month = _timeMonth;
   const monthStart = new Date(year, month, 1).toISOString();
-  const monthEnd   = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
   try {
-    const issues  = await reqAll(`/issues?assignee_username=${ME.username}&state=all&scope=all&updated_after=${monthStart}&updated_before=${monthEnd}`);
+    const issues  = await reqAll(`/issues?assignee_username=${ME.username}&state=all&scope=all&updated_after=${monthStart}`);
     document.getElementById('timeList').innerHTML = '<div class="loading"><span class="spinner"></span>Parsing notes…</div>';
     const results = await Promise.all(issues.map(fetchTimeNotes));
     const map = {};
@@ -2014,13 +2068,6 @@ async function loadTimeReport() {
         if (p.dateStr > map[key].last) map[key].last = p.dateStr;
       }
     }
-    let totalAll = gc('totalAll');
-    if (totalAll === null) {
-      const allI = await reqAll(`/issues?assignee_username=${ME.username}&state=all&scope=all`);
-      totalAll = allI.reduce((s, i) => s + (i.time_stats?.total_time_spent || 0), 0);
-      sc('totalAll', totalAll);
-    }
-
     // Group by project
     const projMap = {};
     for (const { proj, secs } of Object.values(map)) {
@@ -2032,10 +2079,9 @@ async function loadTimeReport() {
 
     document.getElementById('statMonth').textContent  = fmtH(monthSec);
     document.getElementById('statIssues').textContent = projEntries.length;
-    document.getElementById('statTotal').textContent  = fmtH(totalAll);
     sc('stat_month', fmtH(monthSec));
     sc('stat_issues', String(projEntries.length));
-    sc('stat_total', fmtH(totalAll));
+    updateTimeLabel();
 
     if (!projEntries.length) {
       document.getElementById('timeList').innerHTML = '<div class="empty"><div class="eicon">📅</div><p>No time logged this month</p></div>';
@@ -2071,8 +2117,8 @@ function loadTimeReportIfNeeded() {
   if (html) {
     document.getElementById('statMonth').textContent  = gc('stat_month')  || '—';
     document.getElementById('statIssues').textContent = gc('stat_issues') || '—';
-    document.getElementById('statTotal').textContent  = gc('stat_total')  || '—';
     document.getElementById('timeList').innerHTML = html;
+    updateTimeLabel();
   } else {
     loadTimeReport();
   }
