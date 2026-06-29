@@ -410,6 +410,7 @@ select.form-input { cursor: pointer; }
 .toast { position: fixed; bottom: 24px; right: 24px; z-index: 300; background: var(--surface); border: 1px solid var(--green); color: var(--green); padding: 12px 18px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; box-shadow: var(--shadow-lg); animation: toastIn .2s ease; }
 .toast.error { border-color: var(--red); color: var(--red); }
 @keyframes toastIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+#refreshTrack { stroke: var(--border2); opacity: 0.6; }
 </style>
 </head>
 <body>
@@ -422,7 +423,6 @@ select.form-input { cursor: pointer; }
   <div class="header-sep"></div>
   <span class="header-label">Personal Dashboard</span>
   <div class="header-right">
-    <button class="theme-toggle" onclick="openSettings()" title="Settings (S)" style="font-size:15px">⚙</button>
     <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme" id="themeBtn">🌙</button>
     <div class="user-pill" id="userInfo">
       <span class="user-pill-name">Connecting…</span>
@@ -697,6 +697,26 @@ select.form-input { cursor: pointer; }
       <div id="logTable"><div class="empty"><div class="eicon">📅</div><p>Loading…</p></div></div>
     </div>
 
+  </div>
+</div>
+
+<!-- KEYBOARD SHORTCUTS HINT -->
+<div style="position:fixed;bottom:18px;left:18px;z-index:89">
+  <div style="position:relative;width:48px;height:48px;flex-shrink:0">
+    <svg style="position:absolute;inset:0;width:48px;height:48px;transform:rotate(-90deg);pointer-events:none" viewBox="0 0 48 48">
+      <circle id="refreshTrack" cx="24" cy="24" r="22" fill="none" stroke-width="3"/>
+      <circle id="refreshProgress" cx="24" cy="24" r="22" fill="none" stroke="#4fc3f7" stroke-width="3" stroke-linecap="round" stroke-dasharray="138.2" stroke-dashoffset="138.2"/>
+    </svg>
+    <button id="kbdBtn" onclick="toggleKbd(event)" style="position:absolute;inset:4px;width:40px;height:40px;border-radius:50%;border:1px solid var(--border2);background:var(--surface2);color:var(--text3);font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;font-family:monospace" title="Keyboard shortcuts">?</button>
+  </div>
+  <div id="kbdPopup" style="display:none;position:absolute;bottom:36px;left:0;background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:14px 16px;box-shadow:var(--shadow-lg);white-space:nowrap;min-width:200px">
+    <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">Keyboard Shortcuts</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;align-items:center;gap:10px"><kbd style="background:var(--surface2);border:1px solid var(--border2);border-radius:5px;padding:2px 8px;font-size:12px;font-weight:700;color:var(--blue);font-family:monospace;min-width:24px;text-align:center">N</kbd><span style="font-size:12px;color:var(--text2)">Quick Create Issue</span></div>
+      <div style="display:flex;align-items:center;gap:10px"><kbd style="background:var(--surface2);border:1px solid var(--border2);border-radius:5px;padding:2px 8px;font-size:12px;font-weight:700;color:var(--blue);font-family:monospace;min-width:24px;text-align:center">L</kbd><span style="font-size:12px;color:var(--text2)">Quick Log Time</span></div>
+      <div style="display:flex;align-items:center;gap:10px"><kbd style="background:var(--surface2);border:1px solid var(--border2);border-radius:5px;padding:2px 8px;font-size:12px;font-weight:700;color:var(--blue);font-family:monospace;min-width:24px;text-align:center">S</kbd><span style="font-size:12px;color:var(--text2)">Settings</span></div>
+      <div style="display:flex;align-items:center;gap:10px"><kbd style="background:var(--surface2);border:1px solid var(--border2);border-radius:5px;padding:2px 8px;font-size:12px;font-weight:700;color:var(--text3);font-family:monospace;min-width:24px;text-align:center">Esc</kbd><span style="font-size:12px;color:var(--text2)">Close modal</span></div>
+    </div>
   </div>
 </div>
 
@@ -1084,16 +1104,6 @@ async function reqAll(path) {
 }
 
 // ── CONNECT ──
-async function connect() {
-  try {
-    ME = await req('/user');
-    document.getElementById('userInfo').innerHTML =
-      `<img src="${ME.avatar_url}" style="width:26px;height:26px;border-radius:50%"><span class="user-pill-name">${ME.name}</span>`;
-    await loadProjects();
-    await Promise.all([loadMyIssues(), loadDashboard()]);
-    updateLabels();
-  } catch(e) { toast('Connection failed: ' + e.message, true); }
-}
 
 // ── PROJECTS ──
 async function loadProjects() {
@@ -2080,18 +2090,26 @@ function fmtH(s) {
   const h = Math.floor(s/3600), m = Math.floor((s%3600)/60);
   return h > 0 ? (m > 0 ? `${h}h ${m}m` : `${h}h`) : (m > 0 ? `${m}m` : '0m');
 }
-function showPage(name) {
+const PAGE_URLS = { dashboard: '/dashboard', issues: '/issues', create: '/create', log: '/log', time: '/time' };
+const URL_PAGES = Object.fromEntries(Object.entries(PAGE_URLS).map(([k,v]) => [v, k]));
+
+function showPage(name, pushUrl = true) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
   document.getElementById('nav-' + name).classList.add('active');
-  if (name === 'time')    { updateLabels(); loadTimeReportIfNeeded(); }
-  if (name === 'log')     { updateLabels(); loadMonthlyLogIfNeeded(); }
-  if (name === 'issues')  loadMyIssues();
+  if (pushUrl) history.pushState({ page: name }, '', PAGE_URLS[name] || '/dashboard');
+  if (name === 'time')      { updateLabels(); loadTimeReportIfNeeded(); }
+  if (name === 'log')       { updateLabels(); loadMonthlyLogIfNeeded(); }
+  if (name === 'issues')    loadMyIssues();
   if (name === 'dashboard') loadDashboard();
   document.getElementById('fabGroup').style.display = name === 'dashboard' ? 'flex' : 'none';
-  if (name === 'create')  initCreatePage();
+  if (name === 'create')    initCreatePage();
 }
+window.addEventListener('popstate', e => {
+  const name = e.state?.page || URL_PAGES[location.pathname] || 'dashboard';
+  showPage(name, false);
+});
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 function toast(msg, err=false) {
   const t = document.createElement('div');
@@ -2103,6 +2121,24 @@ function toast(msg, err=false) {
 document.querySelectorAll('.modal-overlay').forEach(el => {
   el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
 });
+// ── KEYBOARD HINT ──
+function toggleKbd(e) {
+  e.stopPropagation();
+  const p = document.getElementById('kbdPopup');
+  const isOpen = p.style.display !== 'none';
+  p.style.display = isOpen ? 'none' : 'block';
+  document.getElementById('kbdBtn').style.color = isOpen ? 'var(--text3)' : 'var(--blue)';
+  document.getElementById('kbdBtn').style.borderColor = isOpen ? 'var(--border2)' : 'var(--blue)';
+}
+document.addEventListener('click', () => {
+  const p = document.getElementById('kbdPopup');
+  if (p && p.style.display !== 'none') {
+    p.style.display = 'none';
+    document.getElementById('kbdBtn').style.color = 'var(--text3)';
+    document.getElementById('kbdBtn').style.borderColor = 'var(--border2)';
+  }
+});
+
 // ── SETTINGS ──
 function openSettings() {
   document.getElementById('cfgUrl').value   = CFG.url   || DEFAULT_URL;
@@ -2129,6 +2165,7 @@ async function saveSettings() {
   ME = null; allIssues = []; allProjects = [];
   document.getElementById('userInfo').innerHTML = '<span class="user-pill-name">Connecting…</span>';
   await connect();
+  startAutoRefresh();
 }
 
 document.addEventListener('keydown', e => {
@@ -2139,11 +2176,83 @@ document.addEventListener('keydown', e => {
   if (e.key === 'l' || e.key === 'L') openQuickLog();
   if (e.key === 's' || e.key === 'S') openSettings();
 });
-window.onload = () => {
+const REFRESH_INTERVAL = 30 * 1000; // 30 seconds
+let _refreshTimer = null;
+let _ringTimer = null;
+
+const RING_CIRC = 138.2; // 2 * PI * r (r = 22)
+let _ringInterval = null;
+let _ringStart = 0;
+
+// Drives the ring fill with setInterval + setAttribute.
+// setInterval (unlike requestAnimationFrame) keeps running in background tabs.
+function startRingAnimation() {
+  const p = document.getElementById('refreshProgress');
+  if (!p) return;
+  if (_ringInterval) { clearInterval(_ringInterval); _ringInterval = null; }
+  p.setAttribute('stroke', '#4fc3f7');
+  p.setAttribute('stroke-dashoffset', String(RING_CIRC)); // start empty
+  _ringStart = Date.now();
+  _ringInterval = setInterval(() => {
+    const el = document.getElementById('refreshProgress');
+    if (!el) return;
+    const elapsed = Date.now() - _ringStart;
+    const progress = Math.min(elapsed / REFRESH_INTERVAL, 1);
+    el.setAttribute('stroke-dashoffset', (RING_CIRC * (1 - progress)).toFixed(2));
+    if (progress >= 1) { clearInterval(_ringInterval); _ringInterval = null; }
+  }, 100); // update 10x/sec — smooth and visible
+}
+
+function setRing(color, offset) {
+  const p = document.getElementById('refreshProgress');
+  if (!p) return;
+  if (_ringInterval) { clearInterval(_ringInterval); _ringInterval = null; }
+  p.setAttribute('stroke', color);
+  p.setAttribute('stroke-dashoffset', String(offset));
+}
+
+function startAutoRefresh() {
+  if (_refreshTimer) clearInterval(_refreshTimer);
+  startRingAnimation();
+  _refreshTimer = setInterval(async () => {
+    setRing('var(--yellow)', 0); // full ring = refreshing
+    cacheClear();
+    try {
+      await Promise.all([loadMyIssues(), loadDashboard()]);
+      const cur = URL_PAGES[location.pathname] || 'dashboard';
+      if (cur === 'log')  loadMonthlyLog();
+      if (cur === 'time') loadTimeReport();
+    } catch {
+      // refresh failed (e.g. bad token) — keep the ring cycling anyway
+    }
+    startRingAnimation();
+  }, REFRESH_INTERVAL);
+}
+
+window.onload = async () => {
   cacheClear();
+  // Ring always animates, independent of connection state
+  startRingAnimation();
+  const initPage = URL_PAGES[location.pathname] || 'dashboard';
   if (!CFG.token) { openSettings(); }
-  else connect();
+  else { await connect(initPage); }
+  startAutoRefresh();
 };
+
+async function connect(initPage = 'dashboard') {
+  try {
+    ME = await req('/user');
+    document.getElementById('userInfo').innerHTML =
+      `<img src="${ME.avatar_url}" style="width:26px;height:26px;border-radius:50%"><span class="user-pill-name">${ME.name}</span>`;
+    await loadProjects();
+    showPage(initPage, false);
+    history.replaceState({ page: initPage }, '', PAGE_URLS[initPage] || '/dashboard');
+    await Promise.all([loadMyIssues(), loadDashboard()]);
+    updateLabels();
+  } catch(e) {
+    toast('Connection failed: ' + e.message, true);
+  }
+}
 </script>
 </body>
 </html>
