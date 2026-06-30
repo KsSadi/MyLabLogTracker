@@ -1307,7 +1307,7 @@ function renderSummaryByAssignee() {
     </div>`).join('');
 }
 
-function copySummaryByAssignee() {
+function buildSummaryByAssigneeText() {
   const groups = _summaryAssignees.filter(a => _summaryCheckedKeys.has(a.key)).map(a => {
     const issues = _summaryOpenIssues.filter(i =>
       (i.assignees && i.assignees.length ? i.assignees : [null]).some(x => summaryAssigneeKey(x) === a.key)
@@ -1315,7 +1315,7 @@ function copySummaryByAssignee() {
     return { ...a, issues };
   }).filter(g => g.issues.length);
 
-  if (!groups.length) return toast('No open issues for the selected assignees', true);
+  if (!groups.length) return null;
 
   const pid = document.getElementById('summaryProject').value;
   const proj = allProjects.find(p => String(p.id) === String(pid));
@@ -1330,7 +1330,12 @@ function copySummaryByAssignee() {
     '',
     ...groups.map((g, idx) => `${idx + 1}.${g.name} — ${g.issues.length} Open Issue${g.issues.length === 1 ? '' : 's'} (${g.issues.map(i => '#' + i.iid).join(', ')})`)
   ];
-  const text = lines.join('\n');
+  return lines.join('\n');
+}
+
+function copySummaryByAssignee() {
+  const text = buildSummaryByAssigneeText();
+  if (!text) return toast('No open issues for the selected assignees', true);
 
   navigator.clipboard?.writeText(text).then(() => {
     const btn = document.getElementById('summaryCopyBtn');
@@ -1338,6 +1343,42 @@ function copySummaryByAssignee() {
     btn.innerHTML = '<span class="btn-icon">✓</span> Copied';
     setTimeout(() => btn.innerHTML = orig, 1200);
   }).catch(() => toast('Copy failed', true));
+}
+
+function sendSummaryToWhatsapp() {
+  const text = buildSummaryByAssigneeText();
+  if (!text) return toast('No open issues for the selected assignees', true);
+  window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+}
+
+async function sendSummaryToDiscord() {
+  const text = buildSummaryByAssigneeText();
+  if (!text) return toast('No open issues for the selected assignees', true);
+  const webhook = (CFG.discord_webhook || '').trim();
+  if (!webhook) return toast('Add a Discord Webhook URL in Settings first', true);
+
+  const btn = document.getElementById('summaryDiscordBtn');
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="btn-icon">⏳</span> Sending';
+  try {
+    const chunks = text.match(/[\s\S]{1,1990}/g) || [text];
+    for (const content of chunks) {
+      const res = await fetch(webhook, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content })
+      });
+      if (!res.ok) throw new Error('Discord webhook failed: ' + res.status);
+    }
+    btn.innerHTML = '<span class="btn-icon">✓</span> Sent';
+    setTimeout(() => btn.innerHTML = orig, 1200);
+  } catch (e) {
+    toast(e.message || 'Failed to send to Discord', true);
+    btn.innerHTML = orig;
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 async function generateAiSummary() {
@@ -2156,6 +2197,7 @@ function openSettings() {
   document.getElementById('cfgAiProvider').value  = CFG.ai_provider  || 'gemini';
   document.getElementById('cfgGroqKey').value     = CFG.groq_key     || '';
   document.getElementById('cfgGroqModel').value   = CFG.groq_model   || 'llama-3.3-70b-versatile';
+  document.getElementById('cfgDiscordWebhook').value = CFG.discord_webhook || '';
   aiProviderToggle();
   document.getElementById('settingsModal').classList.add('open');
   setTimeout(() => document.getElementById(CFG.token ? 'cfgUrl' : 'cfgToken').focus(), 100);
@@ -2186,7 +2228,8 @@ async function saveSettings() {
   const ai_provider  = document.getElementById('cfgAiProvider').value;
   const groq_key     = document.getElementById('cfgGroqKey').value.trim();
   const groq_model   = document.getElementById('cfgGroqModel').value;
-  saveCfg({ url: url || DEFAULT_URL, token, sat_off, sat_hours, day_hours, gemini_key, gemini_model, ai_provider, groq_key, groq_model });
+  const discord_webhook = document.getElementById('cfgDiscordWebhook').value.trim();
+  saveCfg({ url: url || DEFAULT_URL, token, sat_off, sat_hours, day_hours, gemini_key, gemini_model, ai_provider, groq_key, groq_model, discord_webhook });
   API   = (CFG.url || DEFAULT_URL).replace(/\/$/, '') + '/api/v4';
   TOKEN = CFG.token;
   closeModal('settingsModal');
