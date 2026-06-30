@@ -1134,12 +1134,19 @@ function fmtH(s) {
 const PAGE_URLS = { dashboard: '/dashboard', issues: '/issues', create: '/create', log: '/log', time: '/time', summary: '/summary', assistant: '/assistant' };
 const URL_PAGES = Object.fromEntries(Object.entries(PAGE_URLS).map(([k,v]) => [v, k]));
 
+function toggleSidebar(force) {
+  const open = typeof force === 'boolean' ? force : !document.getElementById('sidebar').classList.contains('open');
+  document.getElementById('sidebar').classList.toggle('open', open);
+  document.getElementById('sidebarBackdrop').classList.toggle('open', open);
+}
+
 function showPage(name, pushUrl = true) {
   document.documentElement.removeAttribute('data-initial-page');
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
   document.getElementById('nav-' + name).classList.add('active');
+  toggleSidebar(false);
   if (pushUrl) history.pushState({ page: name }, '', PAGE_URLS[name] || '/dashboard');
   if (name === 'time')      { updateLabels(); loadTimeReportIfNeeded(); }
   if (name === 'log')       { updateLabels(); loadMonthlyLogIfNeeded(); }
@@ -2239,6 +2246,16 @@ async function saveSettings() {
   const curPage = URL_PAGES[location.pathname] || 'dashboard';
   await connect(curPage);
   startAutoRefresh();
+}
+
+let _logoTapCount = 0;
+let _logoTapTimer = null;
+function logoTapHandler(e) {
+  e.preventDefault();
+  _logoTapCount++;
+  clearTimeout(_logoTapTimer);
+  _logoTapTimer = setTimeout(() => { _logoTapCount = 0; }, 700);
+  if (_logoTapCount === 3) { openSettings(); _logoTapCount = 0; }
 }
 
 document.addEventListener('keydown', e => {

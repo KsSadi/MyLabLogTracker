@@ -33,7 +33,8 @@
 <body>
 
 <div class="header">
-  <a class="logo" href="#">
+  <button class="menu-toggle" onclick="toggleSidebar()" aria-label="Toggle menu" id="menuToggleBtn">☰</button>
+  <a class="logo" href="#" onclick="logoTapHandler(event)">
     <svg viewBox="0 0 24 24" fill="none"><path d="M12 2L2 9l2 11 8 2 8-2 2-11L12 2z" fill="#e24329"/><path d="M12 2l4 9H8l4-9z" fill="#fc6d26"/><path d="M2 9l6 2-6 9 0-11z" fill="#e24329"/><path d="M22 9l-6 2 6 9 0-11z" fill="#e24329"/><path d="M8 11l4 11-6-9 2-2z" fill="#fc6d26"/><path d="M16 11l-4 11 6-9-2-2z" fill="#fc6d26"/></svg>
     <span class="logo-text">Web<em>Crafter</em></span>
   </a>
@@ -54,8 +55,9 @@
   <span id="connectStatus"></span>
 </div>
 
+<div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar(false)"></div>
 <div class="shell">
-  <div class="sidebar">
+  <div class="sidebar" id="sidebar">
     <div class="nav-group">Overview</div>
     <div class="nav-item" onclick="showPage('dashboard')" id="nav-dashboard">
       <span class="nav-icon">⬡</span> Dashboard
@@ -456,7 +458,7 @@
 </div>
 
 <!-- KEYBOARD SHORTCUTS HINT -->
-<div style="position:fixed;bottom:18px;left:18px;z-index:89">
+<div id="kbdHintWrap" style="position:fixed;bottom:18px;left:18px;z-index:89">
   <div style="position:relative;width:48px;height:48px;flex-shrink:0">
     <svg style="position:absolute;inset:0;width:48px;height:48px;transform:rotate(-90deg);pointer-events:none" viewBox="0 0 48 48">
       <circle id="refreshTrack" cx="24" cy="24" r="22" fill="none" stroke-width="3"/>
@@ -746,7 +748,7 @@
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div class="form-group" style="margin:0">
-        <label class="form-label">Codelab Base URL</label>
+        <label class="form-label">Base URL</label>
         <input type="text" class="form-input" id="cfgUrl" readonly style="cursor:not-allowed;opacity:.7">
       </div>
       <div class="form-group" style="margin:0">
