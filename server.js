@@ -6,7 +6,7 @@ const PORT = 5500;
 const DIR = __dirname;
 const MIME = { html: 'text/html; charset=utf-8', js: 'application/javascript; charset=utf-8', css: 'text/css; charset=utf-8', json: 'application/json; charset=utf-8' };
 
-const SPA_ROUTES = ['/', '/dashboard', '/issues', '/create', '/log', '/time', '/assistant'];
+const SPA_ROUTES = ['/', '/dashboard', '/issues', '/create', '/log', '/time', '/summary', '/assistant'];
 
 http.createServer((req, res) => {
   const urlPath = req.url.split('?')[0];

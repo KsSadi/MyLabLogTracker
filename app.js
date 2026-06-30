@@ -148,7 +148,7 @@ function sdFilter(id) {
   empty.textContent = 'No results for "' + document.getElementById(id + '_search').value + '"';
 }
 // sdHiddenId: maps sd wrapper id → hidden input id
-const _sdHidden = { sdProject: 'createProject', sdMlIssue: 'mlIssue', sdMlProject: 'mlProject', sdQcProject: 'qcProject', sdBulkProject: 'bulkProject' };
+const _sdHidden = { sdProject: 'createProject', sdMlIssue: 'mlIssue', sdMlProject: 'mlProject', sdQcProject: 'qcProject', sdBulkProject: 'bulkProject', sdSummaryProject: 'summaryProject' };
 function sdSelect(id, value, el) {
   const item = (_sdData[id] || []).find(i => i.value === value);
   if (!item) return;
@@ -1131,10 +1131,11 @@ function fmtH(s) {
   const h = Math.floor(s/3600), m = Math.floor((s%3600)/60);
   return h > 0 ? (m > 0 ? `${h}h ${m}m` : `${h}h`) : (m > 0 ? `${m}m` : '0m');
 }
-const PAGE_URLS = { dashboard: '/dashboard', issues: '/issues', create: '/create', log: '/log', time: '/time', assistant: '/assistant' };
+const PAGE_URLS = { dashboard: '/dashboard', issues: '/issues', create: '/create', log: '/log', time: '/time', summary: '/summary', assistant: '/assistant' };
 const URL_PAGES = Object.fromEntries(Object.entries(PAGE_URLS).map(([k,v]) => [v, k]));
 
 function showPage(name, pushUrl = true) {
+  document.documentElement.removeAttribute('data-initial-page');
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
@@ -1143,6 +1144,7 @@ function showPage(name, pushUrl = true) {
   if (name === 'time')      { updateLabels(); loadTimeReportIfNeeded(); }
   if (name === 'log')       { updateLabels(); loadMonthlyLogIfNeeded(); }
   if (name === 'issues')    loadMyIssues();
+  if (name === 'summary')   initSummaryPage();
   if (name === 'dashboard') loadDashboard();
   if (name === 'create')    initCreatePage();
   if (name === 'assistant') initAssistantPage();
@@ -1191,6 +1193,188 @@ document.addEventListener('click', () => {
     document.getElementById('kbdBtn').style.borderColor = 'var(--border2)';
   }
 });
+
+// ── SUMMARY ──
+let _summaryInited = false;
+let _summaryOpenIssues = [];
+let _summaryAssignees = []; // [{key, name}]
+let _summaryCheckedKeys = new Set();
+
+function initSummaryPage() {
+  if (!_summaryInited) {
+    sdPopulate('sdSummaryProject', allProjects.map(p => ({ value: String(p.id), label: p.name_with_namespace })));
+    _summaryInited = true;
+  }
+}
+
+function summaryAssigneeKey(a) { return a ? String(a.id) : '__unassigned__'; }
+function summaryAssigneeName(a) { return a ? a.name : 'Unassigned'; }
+
+async function loadSummary() {
+  const pid = document.getElementById('summaryProject').value;
+  if (!pid) return toast('Select a product first', true);
+  const btn = document.getElementById('summaryGetBtn');
+  const orig = btn.innerHTML;
+  btn.innerHTML = '<span class="spinner" style="width:12px;height:12px;border-width:2px;border-color:rgba(255,255,255,.4);border-top-color:#fff;margin-right:6px"></span> Loading…'; btn.disabled = true;
+  document.getElementById('summaryBody').style.display = 'none';
+  document.getElementById('summaryEmpty').innerHTML = '<div class="loading"><span class="spinner"></span>Fetching issues…</div>';
+  try {
+    const openIssues = await reqAll(`/projects/${pid}/issues?state=opened`);
+
+    _summaryOpenIssues = openIssues;
+
+    const byKey = new Map();
+    openIssues.forEach(i => {
+      (i.assignees && i.assignees.length ? i.assignees : [null]).forEach(a => {
+        const key = summaryAssigneeKey(a);
+        if (!byKey.has(key)) byKey.set(key, summaryAssigneeName(a));
+      });
+    });
+    _summaryAssignees = [...byKey.entries()].map(([key, name]) => ({ key, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    _summaryCheckedKeys = new Set(_summaryAssignees.map(a => a.key)); // all selected by default
+
+    const today = new Date().toISOString().slice(0, 10);
+    const overdueCount = openIssues.filter(i => i.due_date && i.due_date < today).length;
+    const unassignedCount = openIssues.filter(i => !i.assignees || !i.assignees.length).length;
+
+    document.getElementById('summaryKpiOpen').textContent = openIssues.length;
+    document.getElementById('summaryKpiAssignees').textContent = _summaryAssignees.filter(a => a.key !== '__unassigned__').length;
+    document.getElementById('summaryKpiOverdue').textContent = overdueCount;
+    document.getElementById('summaryKpiUnassigned').textContent = unassignedCount;
+    document.getElementById('summaryAiBody').innerHTML = '<span style="color:var(--text3)">Click "Generate AI Summary" to get an AI write-up of the open issues below.</span>';
+
+    renderSummaryAssignees();
+    renderSummaryByAssignee();
+
+    document.getElementById('summaryEmpty').innerHTML = '';
+    document.getElementById('summaryBody').style.display = 'block';
+  } catch (e) {
+    document.getElementById('summaryEmpty').innerHTML = `<div class="sd-empty" style="display:block">Error: ${esc(e.message)}</div>`;
+  }
+  btn.innerHTML = orig; btn.disabled = false;
+}
+
+function renderSummaryAssignees() {
+  const el = document.getElementById('summaryAssigneeList');
+  el.innerHTML = _summaryAssignees.length
+    ? _summaryAssignees.map(a => {
+        const checked = _summaryCheckedKeys.has(a.key);
+        return `<label class="chip ${checked ? 'chip-blue' : 'chip-gray'}" style="cursor:pointer;user-select:none">
+          <input type="checkbox" ${checked ? 'checked' : ''} onchange="summaryToggleAssignee('${a.key}')" style="margin-right:4px">${esc(a.name)}
+        </label>`;
+      }).join('')
+    : '<span style="color:var(--text3);font-size:13px">No open issues</span>';
+}
+
+function summaryToggleAssignee(key) {
+  if (_summaryCheckedKeys.has(key)) _summaryCheckedKeys.delete(key);
+  else _summaryCheckedKeys.add(key);
+  renderSummaryAssignees();
+  renderSummaryByAssignee();
+}
+
+function summarySetAllAssignees(all) {
+  _summaryCheckedKeys = all ? new Set(_summaryAssignees.map(a => a.key)) : new Set();
+  renderSummaryAssignees();
+  renderSummaryByAssignee();
+}
+
+function summaryFilteredIssues() {
+  return _summaryOpenIssues.filter(i => {
+    const keys = (i.assignees && i.assignees.length ? i.assignees : [null]).map(summaryAssigneeKey);
+    return keys.some(k => _summaryCheckedKeys.has(k));
+  });
+}
+
+function renderSummaryByAssignee() {
+  const el = document.getElementById('summaryByAssignee');
+  const groups = _summaryAssignees.filter(a => _summaryCheckedKeys.has(a.key)).map(a => {
+    const issues = _summaryOpenIssues.filter(i =>
+      (i.assignees && i.assignees.length ? i.assignees : [null]).some(x => summaryAssigneeKey(x) === a.key)
+    );
+    return { ...a, issues };
+  }).filter(g => g.issues.length);
+
+  if (!groups.length) { el.innerHTML = '<div class="sd-empty" style="display:block">No open issues for the selected assignees 🎉</div>'; return; }
+
+  el.innerHTML = groups.map(g => `
+    <div style="padding:12px 0;border-bottom:1px solid var(--border2)">
+      <div style="font-weight:700;font-size:13px;margin-bottom:6px">${esc(g.name)} <span style="color:var(--text3);font-weight:500">[${g.issues.length} Issue${g.issues.length === 1 ? '' : 's'}]</span></div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        ${g.issues.map(i => `<a href="${i.web_url}" target="_blank" class="ai-link" style="font-size:12px">#${i.iid}</a>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+function copySummaryByAssignee() {
+  const groups = _summaryAssignees.filter(a => _summaryCheckedKeys.has(a.key)).map(a => {
+    const issues = _summaryOpenIssues.filter(i =>
+      (i.assignees && i.assignees.length ? i.assignees : [null]).some(x => summaryAssigneeKey(x) === a.key)
+    );
+    return { ...a, issues };
+  }).filter(g => g.issues.length);
+
+  if (!groups.length) return toast('No open issues for the selected assignees', true);
+
+  const pid = document.getElementById('summaryProject').value;
+  const proj = allProjects.find(p => String(p.id) === String(pid));
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+  const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+  const lines = [
+    `Project Name : ${proj?.name || ''}`,
+    '',
+    `Assignee Summary ${dateStr} at ${timeStr}`,
+    '',
+    ...groups.map((g, idx) => `${idx + 1}.${g.name} — ${g.issues.length} Open Issue${g.issues.length === 1 ? '' : 's'} (${g.issues.map(i => '#' + i.iid).join(', ')})`)
+  ];
+  const text = lines.join('\n');
+
+  navigator.clipboard?.writeText(text).then(() => {
+    const btn = document.getElementById('summaryCopyBtn');
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<span class="btn-icon">✓</span> Copied';
+    setTimeout(() => btn.innerHTML = orig, 1200);
+  }).catch(() => toast('Copy failed', true));
+}
+
+async function generateAiSummary() {
+  const issues = summaryFilteredIssues();
+  const aiBody = document.getElementById('summaryAiBody');
+  const btn = document.getElementById('summaryAiBtn');
+  if (!issues.length) { aiBody.innerHTML = '<span style="color:var(--text3)">No open issues for the selected assignees.</span>'; return; }
+  if (!aiConfigured()) { toast('Add an AI API key in Settings (S)', true); return; }
+
+  const pid = document.getElementById('summaryProject').value;
+  const proj = allProjects.find(p => String(p.id) === String(pid));
+  const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+
+  const byAssignee = {};
+  issues.forEach(i => {
+    (i.assignees && i.assignees.length ? i.assignees : [null]).forEach(a => {
+      const name = summaryAssigneeName(a);
+      (byAssignee[name] = byAssignee[name] || []).push(`#${i.iid} ${i.title}`);
+    });
+  });
+  const listText = Object.entries(byAssignee)
+    .map(([name, items]) => `${name} [${items.length} Issue${items.length === 1 ? '' : 's'}]:\n${items.join('\n')}`)
+    .join('\n\n');
+
+  const orig = btn.innerHTML;
+  btn.innerHTML = '<span class="btn-icon">✦</span> Generating…'; btn.disabled = true;
+  aiBody.innerHTML = '<div class="loading"><span class="spinner"></span>Generating…</div>';
+  try {
+    const text = await aiCall(
+      `You are a project assistant. Date: ${today}. Product: "${proj?.name}".\n\nOpen issues grouped by assignee:\n\n${listText}\n\nWrite a short, clear summary (3-6 sentences) describing the overall state of work: total open issues, common themes/areas, and anything urgent or blocking. Do not just repeat the raw list.`
+    ) || '';
+    aiBody.innerHTML = text ? mdToHtml(text) : '<span style="color:var(--text3)">No summary returned.</span>';
+  } catch (e) {
+    aiBody.innerHTML = `<span style="color:var(--red)">AI error: ${esc(e.message)}</span>`;
+  }
+  btn.innerHTML = orig; btn.disabled = false;
+}
 
 // ── AI (GEMINI) ──
 // ── AI PROVIDER ROUTER ──
@@ -1981,6 +2165,14 @@ function aiProviderToggle() {
   const p = document.getElementById('cfgAiProvider').value;
   document.getElementById('cfgGeminiBlock').style.display = p === 'groq' ? 'none' : '';
   document.getElementById('cfgGroqBlock').style.display   = p === 'groq' ? '' : 'none';
+  document.getElementById('cfgGeminiKeyWrap').style.display = p === 'groq' ? 'none' : '';
+  document.getElementById('cfgGroqKeyWrap').style.display   = p === 'groq' ? '' : 'none';
+}
+function togglePw(id, btn) {
+  const el = document.getElementById(id);
+  const show = el.type === 'password';
+  el.type = show ? 'text' : 'password';
+  btn.textContent = show ? '🙈' : '👁';
 }
 async function saveSettings() {
   const url   = document.getElementById('cfgUrl').value.trim();

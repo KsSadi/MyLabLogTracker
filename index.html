@@ -6,6 +6,29 @@
 <title>My Codelab Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles.css">
+<script>
+(function() {
+  var URL_PAGES = { '/dashboard':'dashboard', '/issues':'issues', '/create':'create', '/log':'log', '/time':'time', '/summary':'summary', '/assistant':'assistant' };
+  var page = URL_PAGES[location.pathname] || 'dashboard';
+  document.documentElement.setAttribute('data-initial-page', page);
+})();
+</script>
+<style>
+  [data-initial-page="dashboard"] #page-dashboard,
+  [data-initial-page="issues"] #page-issues,
+  [data-initial-page="create"] #page-create,
+  [data-initial-page="log"] #page-log,
+  [data-initial-page="time"] #page-time,
+  [data-initial-page="summary"] #page-summary,
+  [data-initial-page="assistant"] #page-assistant { display: block; }
+  [data-initial-page="dashboard"] #nav-dashboard,
+  [data-initial-page="issues"] #nav-issues,
+  [data-initial-page="create"] #nav-create,
+  [data-initial-page="log"] #nav-log,
+  [data-initial-page="time"] #nav-time,
+  [data-initial-page="summary"] #nav-summary,
+  [data-initial-page="assistant"] #nav-assistant { color: var(--blue); background: var(--blue-bg); font-weight: 600; }
+</style>
 </head>
 <body>
 
@@ -34,7 +57,7 @@
 <div class="shell">
   <div class="sidebar">
     <div class="nav-group">Overview</div>
-    <div class="nav-item active" onclick="showPage('dashboard')" id="nav-dashboard">
+    <div class="nav-item" onclick="showPage('dashboard')" id="nav-dashboard">
       <span class="nav-icon">⬡</span> Dashboard
     </div>
 
@@ -48,6 +71,9 @@
     </div>
 
     <div class="nav-group">Reports</div>
+    <div class="nav-item" onclick="showPage('summary')" id="nav-summary">
+      <span class="nav-icon">🧾</span> Summary
+    </div>
     <div class="nav-item" onclick="showPage('log')" id="nav-log">
       <span class="nav-icon">📅</span> Monthly Log
     </div>
@@ -64,7 +90,7 @@
   <div class="content">
 
     <!-- DASHBOARD -->
-    <div class="page active" id="page-dashboard">
+    <div class="page" id="page-dashboard">
       <div class="dash-welcome">
         <h1 id="dashGreet">Good morning 👋</h1>
         <p id="dashDate" style="color:var(--text2)"></p>
@@ -138,6 +164,81 @@
         </select>
       </div>
       <div id="issuesList"><div class="loading"><span class="spinner"></span>Connecting…</div></div>
+    </div>
+
+    <!-- SUMMARY -->
+    <div class="page" id="page-summary">
+      <div class="page-hd"><h2>Summary</h2></div>
+      <div class="filter-row">
+        <div class="sd-wrap" id="sdSummaryProject" style="min-width:280px">
+          <div class="sd-display" onclick="sdToggle('sdSummaryProject')" id="sdSummaryProject_display">
+            <span id="sdSummaryProject_label" class="sd-placeholder">— Select a product —</span>
+            <span class="sd-arrow">▾</span>
+          </div>
+          <div class="sd-dropdown" id="sdSummaryProject_drop">
+            <div class="sd-search-wrap"><input class="sd-search" id="sdSummaryProject_search" placeholder="Search products…" oninput="sdFilter('sdSummaryProject')" onclick="event.stopPropagation()"></div>
+            <div class="sd-list" id="sdSummaryProject_list"></div>
+          </div>
+        </div>
+        <input type="hidden" id="summaryProject">
+        <button class="btn btn-primary btn-sm" id="summaryGetBtn" onclick="loadSummary()"><svg class="btn-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg> Get Summary</button>
+      </div>
+
+      <div id="summaryBody" style="display:none">
+        <div class="dash-card" style="margin-bottom:16px">
+          <div class="dash-card-hd">
+            <h3>Assignees</h3>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-ghost btn-sm" onclick="summarySetAllAssignees(true)">Select all</button>
+              <button class="btn btn-ghost btn-sm" onclick="summarySetAllAssignees(false)">Clear</button>
+            </div>
+          </div>
+          <div class="dash-card-body" id="summaryAssigneeList" style="padding:14px 20px;display:flex;flex-wrap:wrap;gap:8px;max-height:none"></div>
+        </div>
+
+        <div class="kpi-grid" style="margin-bottom:16px">
+          <div class="kpi">
+            <div class="kpi-accent" style="background:var(--blue)"></div>
+            <div class="kpi-label">Open Issues</div>
+            <div class="kpi-value" style="color:var(--blue)" id="summaryKpiOpen">—</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-accent" style="background:var(--purple)"></div>
+            <div class="kpi-label">Assignees</div>
+            <div class="kpi-value" style="color:var(--purple)" id="summaryKpiAssignees">—</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-accent" style="background:var(--red)"></div>
+            <div class="kpi-label">Overdue</div>
+            <div class="kpi-value" style="color:var(--red)" id="summaryKpiOverdue">—</div>
+            <div class="kpi-sub">past due date</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-accent" style="background:var(--green)"></div>
+            <div class="kpi-label">Unassigned</div>
+            <div class="kpi-value" style="color:var(--green)" id="summaryKpiUnassigned">—</div>
+          </div>
+        </div>
+
+        <div class="dash-card" style="margin-bottom:16px">
+          <div class="dash-card-hd">
+            <h3>AI Summary</h3>
+            <button class="btn btn-ghost btn-sm" id="summaryAiBtn" onclick="generateAiSummary()"><span class="btn-icon">✦</span> Generate AI Summary</button>
+          </div>
+          <div class="dash-card-body" id="summaryAiBody" style="padding:16px 20px;font-size:13px;line-height:1.6;max-height:none">
+            <span style="color:var(--text3)">Click "Generate AI Summary" to get an AI write-up of the open issues below.</span>
+          </div>
+        </div>
+
+        <div class="dash-card">
+          <div class="dash-card-hd">
+            <h3>Issues by Assignee</h3>
+            <button class="btn btn-ghost btn-sm" id="summaryCopyBtn" onclick="copySummaryByAssignee()"><span class="btn-icon">⧉</span> Copy</button>
+          </div>
+          <div class="dash-card-body" id="summaryByAssignee" style="padding:8px 20px;max-height:none"></div>
+        </div>
+      </div>
+      <div id="summaryEmpty"></div>
     </div>
 
     <!-- CREATE -->
@@ -595,9 +696,9 @@
 </div>
 
 <!-- AI CHAT MODAL -->
-<div class="modal-overlay" id="aiChatModal">
-  <div class="modal" style="max-width:520px;height:560px;display:flex;flex-direction:column">
-    <div style="display:flex;align-items:center;gap:11px;margin:-28px -28px 18px;padding:15px 20px;border-radius:16px 16px 0 0;border-bottom:1px solid var(--border)">
+<div class="modal-overlay ai-fab-overlay" id="aiChatModal">
+  <div class="modal ai-fab-modal" style="display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;gap:11px;margin:-20px -20px 14px;padding:15px 20px;border-radius:16px 16px 0 0;border-bottom:1px solid var(--border)">
       <div style="width:38px;height:38px;border-radius:11px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--blue);box-shadow:0 4px 12px var(--blue-bg),inset 0 1px 0 rgba(255,255,255,.25)">
         <svg width="25" height="25" viewBox="0 0 24 24" fill="none">
           <circle cx="12" cy="2.7" r="1.35" fill="#fff"/>
@@ -617,10 +718,10 @@
         </div>
       </div>
       <button onclick="craftyStats()" title="My stats" style="background:none;border:none;font-size:15px;cursor:pointer;color:var(--text3);line-height:1;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;transition:all .15s" onmouseover="this.style.background='var(--surface2)';this.style.color='var(--text)'" onmouseout="this.style.background='none';this.style.color='var(--text3)'">📊</button>
-      <button onclick="clearAiChat()" title="New chat" style="background:none;border:none;font-size:16px;cursor:pointer;color:var(--text3);line-height:1;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;transition:all .15s" onmouseover="this.style.background='var(--surface2)';this.style.color='var(--text)'" onmouseout="this.style.background='none';this.style.color='var(--text3)'">＋</button>
+      <button onclick="clearAiChat()" title="New chat" style="background:none;border:none;font-size:22px;font-weight:400;cursor:pointer;color:var(--text3);line-height:1;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;transition:all .15s" onmouseover="this.style.background='var(--surface2)';this.style.color='var(--text)'" onmouseout="this.style.background='none';this.style.color='var(--text3)'">+</button>
       <button onclick="closeModal('aiChatModal')" style="background:none;border:none;font-size:17px;cursor:pointer;color:var(--text3);line-height:1;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;transition:all .15s" onmouseover="this.style.background='var(--surface2)';this.style.color='var(--text)'" onmouseout="this.style.background='none';this.style.color='var(--text3)'">✕</button>
     </div>
-    <div id="aiChatMessages" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:4px 0;margin-bottom:12px"></div>
+    <div id="aiChatMessages" class="ai-fab-messages" style="flex:1;display:flex;flex-direction:column;gap:10px;padding:4px 6px 4px 0;margin-bottom:12px"></div>
     <div style="display:flex;gap:8px">
       <input type="text" class="form-input" id="aiChatInput" placeholder="Type a message…" style="flex:1;margin:0" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();aiChatSend();}">
       <button class="btn" onclick="aiVoiceInput()" id="aiMicBtn" title="Speak" style="flex-shrink:0;padding:0 12px">🎙️</button>
@@ -631,17 +732,22 @@
 
 <!-- SETTINGS MODAL -->
 <div class="modal-overlay" id="settingsModal">
-  <div class="modal" style="max-width:480px">
+  <div class="modal" style="width:760px;max-width:95vw">
     <div class="modal-title">⚙ Settings</div>
     <div class="modal-sub">Configure your Codelab connection and work schedule</div>
 
-    <div class="form-group">
-      <label class="form-label">Codelab Base URL</label>
-      <input type="text" class="form-input" id="cfgUrl" placeholder="https://codelab.ba-systems.com">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Private Token <span class="req">*</span></label>
-      <input type="password" class="form-input" id="cfgToken" placeholder="glpat-xxxxxxxxxxxx">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="form-group" style="margin:0">
+        <label class="form-label">Codelab Base URL</label>
+        <input type="text" class="form-input" id="cfgUrl" readonly style="cursor:not-allowed;opacity:.7">
+      </div>
+      <div class="form-group" style="margin:0">
+        <label class="form-label">Private Token <span class="req">*</span></label>
+        <div class="pw-wrap">
+          <input type="password" class="form-input" id="cfgToken" placeholder="glpat-xxxxxxxxxxxx">
+          <button type="button" class="pw-toggle" onclick="togglePw('cfgToken', this)" tabindex="-1">👁</button>
+        </div>
+      </div>
     </div>
 
     <div style="height:1px;background:var(--border);margin:20px 0"></div>
@@ -678,21 +784,33 @@
     <div style="font-size:11px;color:var(--text3);margin-top:10px">Friday is always OFF. Checked Saturdays = OFF day. Unchecked = working day.</div>
 
     <div style="height:1px;background:var(--border);margin:20px 0"></div>
-    <div class="form-group" style="margin:0">
-      <label class="form-label">✦ AI Provider <span style="font-size:11px;color:var(--text3);font-weight:400">(for Crafty &amp; AI features)</span></label>
-      <select class="form-input" id="cfgAiProvider" onchange="aiProviderToggle()">
-        <option value="gemini">Google Gemini</option>
-        <option value="groq">Groq (fast, free)</option>
-      </select>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="form-group" style="margin:0">
+        <label class="form-label">✦ AI Provider <span style="font-size:11px;color:var(--text3);font-weight:400"></span></label>
+        <select class="form-input" id="cfgAiProvider" onchange="aiProviderToggle()">
+          <option value="gemini">Google Gemini</option>
+          <option value="groq">Groq (fast, free)</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin:0" id="cfgGeminiKeyWrap">
+        <label class="form-label">Gemini API Key</label>
+        <div class="pw-wrap">
+          <input type="password" class="form-input" id="cfgGeminiKey" placeholder="AIza...">
+          <button type="button" class="pw-toggle" onclick="togglePw('cfgGeminiKey', this)" tabindex="-1">👁</button>
+        </div>
+      </div>
+      <div class="form-group" style="margin:0;display:none" id="cfgGroqKeyWrap">
+        <label class="form-label">Groq API Key</label>
+        <div class="pw-wrap">
+          <input type="password" class="form-input" id="cfgGroqKey" placeholder="gsk_...">
+          <button type="button" class="pw-toggle" onclick="togglePw('cfgGroqKey', this)" tabindex="-1">👁</button>
+        </div>
+      </div>
     </div>
 
     <!-- GEMINI -->
     <div id="cfgGeminiBlock">
-      <div class="form-group" style="margin:10px 0 0">
-        <label class="form-label">Gemini API Key</label>
-        <input type="password" class="form-input" id="cfgGeminiKey" placeholder="AIza...">
-        <div style="font-size:11px;color:var(--text3);margin-top:6px">Get a free key from <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--blue)">Google AI Studio</a></div>
-      </div>
       <div class="form-group" style="margin:10px 0 0">
         <label class="form-label">Gemini Model</label>
         <select class="form-input" id="cfgGeminiModel">
@@ -700,15 +818,11 @@
           <option value="gemini-2.5-flash">gemini-2.5-flash (smarter)</option>
         </select>
       </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px">Get a free key from <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--blue)">Google AI Studio</a></div>
     </div>
 
     <!-- GROQ -->
     <div id="cfgGroqBlock" style="display:none">
-      <div class="form-group" style="margin:10px 0 0">
-        <label class="form-label">Groq API Key</label>
-        <input type="password" class="form-input" id="cfgGroqKey" placeholder="gsk_...">
-        <div style="font-size:11px;color:var(--text3);margin-top:6px">Get a free key from <a href="https://console.groq.com/keys" target="_blank" style="color:var(--blue)">Groq Console</a></div>
-      </div>
       <div class="form-group" style="margin:10px 0 0">
         <label class="form-label">Groq Model</label>
         <select class="form-input" id="cfgGroqModel">
@@ -717,6 +831,7 @@
           <option value="llama-3.1-8b-instant">llama-3.1-8b-instant (fastest)</option>
         </select>
       </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px">Get a free key from <a href="https://console.groq.com/keys" target="_blank" style="color:var(--blue)">Groq Console</a></div>
     </div>
 
     <div class="modal-footer">
