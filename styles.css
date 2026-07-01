@@ -560,3 +560,72 @@ select.form-input { cursor: pointer; }
   .kpi-grid { grid-template-columns: 1fr; }
   .logo-text { font-size: 15px; }
 }
+
+/* ── MY ACTIVITY — heatmap ── */
+.heat-legend { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text2); }
+/* GitHub-style: compact fixed-size cells, centered in the card, responsive */
+.heat-grid {
+  --heat-cell: 34px;      /* cell edge length — height stays fixed regardless of width */
+  --heat-gap: 6px;
+  width: max-content;
+  max-width: 100%;
+  margin: 0 auto;         /* center within the card */
+}
+.heat-dow-row,
+.heat-cells {
+  display: grid;
+  grid-template-columns: repeat(7, var(--heat-cell));
+  gap: var(--heat-gap);
+}
+.heat-dow-row { margin-bottom: 8px; }
+.heat-dow { text-align: center; font-size: 11px; font-weight: 700; color: var(--text2); letter-spacing: .5px; }
+.heat-cell {
+  width: var(--heat-cell);
+  height: var(--heat-cell);
+  border-radius: 7px;
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  transition: transform .12s ease, box-shadow .12s ease, filter .12s ease;
+  cursor: default;
+}
+.heat-cell:not(.blank):not(.future):hover {
+  transform: translateY(-2px) scale(1.06);
+  box-shadow: 0 5px 14px -4px color-mix(in srgb, var(--green) 55%, transparent);
+  filter: saturate(1.15);
+  z-index: 2;
+}
+.heat-legend .heat-cell { width: 14px; height: 14px; border-radius: 4px; }
+.heat-cell.blank { background: transparent; pointer-events: none; }
+.heat-cell .heat-num { padding: 3px 5px; font-size: 10px; font-weight: 600; color: var(--text2); opacity: .55; line-height: 1; }
+.heat-cell.l0 { background: var(--surface3); }
+.heat-cell.l1 { background: color-mix(in srgb, var(--green) 28%, var(--surface3)); }
+.heat-cell.l2 { background: color-mix(in srgb, var(--green) 52%, var(--surface3)); }
+.heat-cell.l3 { background: color-mix(in srgb, var(--green) 76%, var(--surface3)); }
+.heat-cell.l4 { background: var(--green); box-shadow: 0 0 0 1px color-mix(in srgb, var(--green) 60%, transparent) inset; }
+.heat-cell.l2 .heat-num { opacity: .7; }
+.heat-cell.l3 .heat-num, .heat-cell.l4 .heat-num { color: #fff; opacity: .95; }
+.heat-cell.today { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--green); }
+.heat-cell.future { background: transparent; border: 1.5px dashed var(--border); }
+.heat-cell.future .heat-num { opacity: .3; }
+@media (max-width: 560px) {
+  .heat-grid { --heat-cell: 30px; --heat-gap: 5px; }
+  .heat-cell { border-radius: 6px; }
+  .heat-cell .heat-num { font-size: 9px; padding: 2px 4px; }
+}
+@media (max-width: 380px) {
+  .heat-grid { --heat-cell: 26px; --heat-gap: 4px; }
+}
+
+/* Activity — heatmap + top projects side-by-side */
+.act-row {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .act-row { grid-template-columns: 1fr; }
+}

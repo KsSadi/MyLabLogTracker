@@ -187,19 +187,8 @@ function updateLogLabel() {
 }
 
 // ── DASHBOARD ──
-async function loadDashboard() {
-  const now = new Date();
-  const h = now.getHours();
-  const greet = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
-  document.getElementById('dashGreet').textContent = `${greet}, ${ME?.name?.split(' ')[0] || ''} 👋`;
-  document.getElementById('dashDate').textContent = now.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
-
-  // Load open issues for KPI + recent list
-  let open = gc('openIssues');
-  if (!open) { open = await reqAll(`/issues?assignee_username=${ME.username}&state=opened&scope=all`); sc('openIssues', open); }
+function renderDashOpenIssues(open) {
   document.getElementById('kpiOpen').textContent = open.length;
-
-  // Recent 8 open issues
   const recent = open.slice(0, 8);
   document.getElementById('dashIssues').innerHTML = recent.length ? recent.map(i => {
     const proj = i.references?.full?.split('#')[0] || i.web_url.split('/-/')[0].split('/').slice(-2).join('/');
@@ -209,9 +198,27 @@ async function loadDashboard() {
       <div><div class="dash-issue-title">${i.title}</div><div class="dash-issue-proj" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">${proj}${labels ? '<span style="color:var(--border2)">·</span>'+labels : ''}</div></div>
     </div>`;
   }).join('') : '<div class="empty"><div class="eicon">✕</div><p>No open issues</p></div>';
+}
 
-  // Monthly log for KPI
-  await loadMonthlyLogData();
+async function loadDashboard() {
+  const now = new Date();
+  const h = now.getHours();
+  const greet = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+  document.getElementById('dashGreet').textContent = `${greet}, ${ME?.name?.split(' ')[0] || ''} 👋`;
+  document.getElementById('dashDate').textContent = now.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+
+  // ── Instant render from cache (if present), then refresh in the background ──
+  const cachedOpen = gc('openIssues');
+  if (cachedOpen) renderDashOpenIssues(cachedOpen);
+
+  // Open issues (KPI + recent list) — refresh in the background
+  reqAll(`/issues?assignee_username=${ME.username}&state=opened&scope=all`)
+    .then(open => { sc('openIssues', open); renderDashOpenIssues(open); })
+    .catch(() => {});
+
+  // Monthly log KPIs (heavy: per-issue notes). Don't block — buildDayMap serves
+  // from cache instantly when available, and refreshes on its own.
+  loadMonthlyLogData().catch(() => {});
 }
 
 // ── CACHE (sessionStorage + memory) ──
@@ -820,15 +827,12 @@ function updateTimeSummary() {
   rows.forEach(r => { total += parseSecsFromStr(r.value.trim()); });
   const sumEl = document.getElementById('timeSummary');
   const valEl = document.getElementById('timeSummaryVal');
-  const closeOpt = document.getElementById('nleCloseOpt');
   if (total > 0) {
     const h = Math.floor(total / 3600), m = Math.floor((total % 3600) / 60);
     valEl.textContent = m > 0 ? `${h}h ${m}m` : `${h}h`;
     sumEl.style.display = 'flex';
-    if (closeOpt) closeOpt.style.display = 'block';
   } else {
     sumEl.style.display = 'none';
-    if (closeOpt) closeOpt.style.display = 'none';
   }
 }
 
@@ -842,7 +846,6 @@ function resetCreateForm() {
   document.getElementById('createDesc').value = '';
   document.getElementById('timeEntryList').innerHTML = '';
   const cb = document.getElementById('createAndClose'); if (cb) cb.checked = false;
-  document.getElementById('nleCloseOpt').style.display = 'none';
   document.getElementById('timeSummary').style.display = 'none';
   _rowCount = 0;
   _assignMe = true;
@@ -1131,7 +1134,159 @@ function fmtH(s) {
   const h = Math.floor(s/3600), m = Math.floor((s%3600)/60);
   return h > 0 ? (m > 0 ? `${h}h ${m}m` : `${h}h`) : (m > 0 ? `${m}m` : '0m');
 }
-const PAGE_URLS = { dashboard: '/dashboard', issues: '/issues', create: '/create', log: '/log', time: '/time', summary: '/summary', assistant: '/assistant' };
+
+// ── MY ACTIVITY ──
+function localDateKey(dateInput) {
+  const d = new Date(dateInput);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+async function loadActivityIfNeeded() {
+  const cached = gc('render_activity');
+  if (cached) {
+    document.getElementById('activityHeatmap').innerHTML  = cached.heat;
+    document.getElementById('activityProjects').innerHTML = cached.projects || '';
+    applyActivityKpis(cached.kpis);
+    return;
+  }
+  loadActivity();
+}
+
+function applyActivityKpis(k) {
+  document.getElementById('actKpiCommits').textContent    = k.commits;
+  document.getElementById('actKpiCommitsSub').textContent = `${k.pushEvents} push events`;
+  document.getElementById('actKpiActiveDays').textContent = k.activeDays;
+  document.getElementById('actKpiStreak').textContent     = k.streak;
+  document.getElementById('actKpiEvents').textContent     = k.total;
+  document.getElementById('actKpiBestDay').textContent    = k.bestDay ? `most active: ${k.bestDay}` : 'most active: —';
+}
+
+const ACTIVITY_WINDOW_DAYS = 30;
+
+async function loadActivity() {
+  if (!ME) return;
+  const now = new Date();
+  // Rolling window: last 30 days (today and the 29 days before it), inclusive
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (ACTIVITY_WINDOW_DAYS - 1));
+  const afterParam = new Date(start.getTime() - 86400000); // GitLab `after` is exclusive → step back a day
+  const afterKey = localDateKey(afterParam);
+  document.getElementById('activityMonthLabel').textContent =
+    `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+  document.getElementById('activityHeatmap').innerHTML  = '<div class="loading"><span class="spinner"></span>Loading events…</div>';
+  document.getElementById('activityProjects').innerHTML = '<div class="loading"><span class="spinner"></span>Loading…</div>';
+
+  try {
+    const events = await reqAll(`/events?after=${afterKey}&per_page=100`);
+
+    const startKey = localDateKey(start);
+    const todayKey = localDateKey(now);
+
+    // Per-day event counts + per-project COMMIT counts + commit total
+    const dayCounts = {};      // dateKey -> total events (for the heatmap)
+    const projectCommits = {}; // project_id -> commits pushed (for Top Projects)
+    let commits = 0, pushEvents = 0;
+
+    events.forEach(ev => {
+      const key = localDateKey(ev.created_at);
+      // keep only events inside the rolling window [startKey, todayKey]
+      if (key < startKey || key > todayKey) return;
+      dayCounts[key] = (dayCounts[key] || 0) + 1;
+      const action = ev.action_name || 'updated';
+      if (action === 'pushed' || action === 'pushed to' || action === 'pushed new') {
+        pushEvents++;
+        const c = ev.push_data?.commit_count || 1;
+        commits += c;
+        if (ev.project_id) projectCommits[ev.project_id] = (projectCommits[ev.project_id] || 0) + c;
+      }
+    });
+
+    // KPIs
+    const activeDays = Object.keys(dayCounts).length;
+    const total = Object.values(dayCounts).reduce((s, n) => s + n, 0);
+
+    // current streak — walk backwards from today across the window
+    let streak = 0;
+    for (let back = 0; back < ACTIVITY_WINDOW_DAYS; back++) {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - back);
+      const key = localDateKey(d);
+      if (dayCounts[key]) streak++;
+      else if (back !== 0) break; // allow today to be empty without breaking streak
+    }
+
+    // best day
+    let bestDay = '', bestCount = 0;
+    Object.entries(dayCounts).forEach(([key, n]) => {
+      if (n > bestCount) { bestCount = n; bestDay = key; }
+    });
+    const bestDayLabel = bestDay
+      ? `${new Date(bestDay + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} (${bestCount})`
+      : '';
+
+    const kpis = { commits, pushEvents, activeDays, streak, total, bestDay: bestDayLabel };
+    applyActivityKpis(kpis);
+
+    // Heatmap — rolling 30-day grid, aligned by weekday (Sun..Sat columns)
+    const maxDay = Math.max(...Object.values(dayCounts), 1);
+    const heat = buildActivityHeatmap(start, ACTIVITY_WINDOW_DAYS, dayCounts, maxDay);
+    document.getElementById('activityHeatmap').innerHTML = heat;
+
+    // Top projects by commits — beside the heatmap
+    const projects = buildActivityProjects(projectCommits);
+    document.getElementById('activityProjects').innerHTML = projects;
+
+    sc('render_activity', { heat, projects, kpis });
+  } catch (e) {
+    document.getElementById('activityHeatmap').innerHTML =
+      `<div class="empty"><div class="eicon">⚠️</div><p>${esc(e.message)}</p></div>`;
+    document.getElementById('activityProjects').innerHTML = '';
+  }
+}
+
+function buildActivityProjects(projectCommits) {
+  const entries = Object.entries(projectCommits).sort((a,b) => b[1]-a[1]).slice(0, 6);
+  if (!entries.length) {
+    return '<div class="empty" style="padding:14px"><p style="color:var(--text2);font-size:12px">No commits pushed</p></div>';
+  }
+  const max = entries[0][1];
+  return entries.map(([pid, n]) => {
+    const pct = Math.round((n / max) * 100);
+    const name = projName(pid).split('/').pop().trim();
+    return `<div class="day-row">
+      <div class="day-date" style="width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(projName(pid))}">${esc(name)}</div>
+      <div class="day-bar-wrap"><div class="day-bar" style="width:${pct}%;background:var(--green)"></div></div>
+      <div class="day-hours">${n} commit${n === 1 ? '' : 's'}</div>
+    </div>`;
+  }).join('');
+}
+
+function heatLevel(count, max) {
+  if (!count) return 0;
+  const r = count / max;
+  if (r <= 0.25) return 1;
+  if (r <= 0.5)  return 2;
+  if (r <= 0.75) return 3;
+  return 4;
+}
+
+function buildActivityHeatmap(start, days, dayCounts, maxDay) {
+  const todayKey = localDateKey(new Date());
+  let cells = '';
+  // leading blanks so the first day lands in its weekday column
+  for (let i = 0; i < start.getDay(); i++) cells += '<div class="heat-cell blank"></div>';
+  for (let i = 0; i < days; i++) {
+    const dObj = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+    const key = localDateKey(dObj);
+    const count = dayCounts[key] || 0;
+    const lvl = 'l' + heatLevel(count, maxDay);
+    const isToday = key === todayKey ? ' today' : '';
+    const title = `${key} · ${count} event${count === 1 ? '' : 's'}`;
+    cells += `<div class="heat-cell ${lvl}${isToday}" title="${title}"><span class="heat-num">${dObj.getDate()}</span></div>`;
+  }
+  const dow = ['S','M','T','W','T','F','S'].map(x => `<div class="heat-dow">${x}</div>`).join('');
+  return `<div class="heat-grid"><div class="heat-dow-row">${dow}</div><div class="heat-cells">${cells}</div></div>`;
+}
+
+const PAGE_URLS = { dashboard: '/dashboard', issues: '/issues', create: '/create', log: '/log', time: '/time', summary: '/summary', activity: '/activity', assistant: '/assistant' };
 const URL_PAGES = Object.fromEntries(Object.entries(PAGE_URLS).map(([k,v]) => [v, k]));
 
 function toggleSidebar(force) {
@@ -1152,6 +1307,7 @@ function showPage(name, pushUrl = true) {
   if (name === 'log')       { updateLabels(); loadMonthlyLogIfNeeded(); }
   if (name === 'issues')    loadMyIssues();
   if (name === 'summary')   initSummaryPage();
+  if (name === 'activity')  loadActivityIfNeeded();
   if (name === 'dashboard') loadDashboard();
   if (name === 'create')    initCreatePage();
   if (name === 'assistant') initAssistantPage();
@@ -2317,7 +2473,8 @@ function startAutoRefresh() {
 }
 
 window.onload = async () => {
-  cacheClear();
+  // NOTE: no cacheClear() here — keeping the cache is what makes repeat loads instant.
+  // Fresh data is fetched in the background by loadDashboard/loadMyIssues and by startAutoRefresh.
   // Ring always animates, independent of connection state
   startRingAnimation();
   const initPage = URL_PAGES[location.pathname] || 'dashboard';
@@ -2334,7 +2491,10 @@ async function connect(initPage = 'dashboard') {
     await loadProjects();
     showPage(initPage, false);
     history.replaceState({ page: initPage }, '', PAGE_URLS[initPage] || '/dashboard');
-    await Promise.all([loadMyIssues(), loadDashboard()]);
+    // Fire page loads but don't block the connect() resolution on the heavy ones.
+    // loadDashboard internally renders cached data instantly, then refreshes in the background.
+    loadMyIssues();
+    loadDashboard();
     updateLabels();
   } catch(e) {
     toast('Connection failed: ' + e.message, true);

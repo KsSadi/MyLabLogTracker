@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="/styles.css">
 <script>
 (function() {
-  var URL_PAGES = { '/dashboard':'dashboard', '/issues':'issues', '/create':'create', '/log':'log', '/time':'time', '/summary':'summary', '/assistant':'assistant' };
+  var URL_PAGES = { '/dashboard':'dashboard', '/issues':'issues', '/create':'create', '/log':'log', '/time':'time', '/summary':'summary', '/activity':'activity', '/assistant':'assistant' };
   var page = URL_PAGES[location.pathname] || 'dashboard';
   document.documentElement.setAttribute('data-initial-page', page);
 })();
@@ -20,6 +20,7 @@
   [data-initial-page="log"] #page-log,
   [data-initial-page="time"] #page-time,
   [data-initial-page="summary"] #page-summary,
+  [data-initial-page="activity"] #page-activity,
   [data-initial-page="assistant"] #page-assistant { display: block; }
   [data-initial-page="dashboard"] #nav-dashboard,
   [data-initial-page="issues"] #nav-issues,
@@ -27,6 +28,7 @@
   [data-initial-page="log"] #nav-log,
   [data-initial-page="time"] #nav-time,
   [data-initial-page="summary"] #nav-summary,
+  [data-initial-page="activity"] #nav-activity,
   [data-initial-page="assistant"] #nav-assistant { color: var(--blue); background: var(--blue-bg); font-weight: 600; }
 </style>
 </head>
@@ -81,6 +83,10 @@
     </div>
     <div class="nav-item" onclick="showPage('time')" id="nav-time">
       <span class="nav-icon">⏱</span> Time Report
+    </div>
+
+    <div class="nav-item" onclick="showPage('activity')" id="nav-activity">
+      <span class="nav-icon">📈</span> My Activity
     </div>
 
     <div class="nav-group">Assistant</div>
@@ -321,7 +327,7 @@
               <span style="color:var(--text3);font-size:12px">TOTAL</span>
               <span id="timeSummaryVal" style="color:var(--blue);font-weight:800;font-size:18px">0h</span>
             </div>
-            <div class="nle-close-opt" id="nleCloseOpt" style="display:none">
+            <div class="nle-close-opt" id="nleCloseOpt">
               <label class="nle-check-row">
                 <input type="checkbox" id="createAndClose" style="width:15px;height:15px;accent-color:var(--red);cursor:pointer;flex-shrink:0">
                 <span>Close issue after creating &amp; logging</span>
@@ -415,6 +421,71 @@
         </div>
       </div>
       <div id="logTable"><div class="empty"><div class="eicon">📅</div><p>Loading…</p></div></div>
+    </div>
+
+    <!-- MY ACTIVITY -->
+    <div class="page" id="page-activity">
+      <div class="page-hd">
+        <h2>My Activity</h2>
+        <div class="page-hd-right">
+          <span id="activityMonthLabel" style="color:var(--text2);font-size:13px;margin-right:10px"></span>
+          <button class="btn btn-ghost btn-sm" onclick="cacheClear();loadActivity()">… Refresh</button>
+        </div>
+      </div>
+
+      <div class="kpi-grid" style="margin-bottom:16px">
+        <div class="kpi">
+          <div class="kpi-accent" style="background:var(--blue)"></div>
+          <div class="kpi-label">Pushes / Commits</div>
+          <div class="kpi-value" style="color:var(--blue)" id="actKpiCommits">—</div>
+          <div class="kpi-sub" id="actKpiCommitsSub">last 30 days</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-accent" style="background:var(--green)"></div>
+          <div class="kpi-label">Active Days</div>
+          <div class="kpi-value" style="color:var(--green)" id="actKpiActiveDays">—</div>
+          <div class="kpi-sub">days with activity</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-accent" style="background:var(--purple)"></div>
+          <div class="kpi-label">Current Streak</div>
+          <div class="kpi-value" style="color:var(--purple)" id="actKpiStreak">—</div>
+          <div class="kpi-sub" id="actKpiStreakSub">consecutive days</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-accent" style="background:var(--yellow)"></div>
+          <div class="kpi-label">Total Events</div>
+          <div class="kpi-value" style="color:var(--yellow)" id="actKpiEvents">—</div>
+          <div class="kpi-sub" id="actKpiBestDay">most active: —</div>
+        </div>
+      </div>
+
+      <div class="act-row">
+        <div class="dash-card">
+          <div class="dash-card-hd">
+            <h3>Contribution Heatmap</h3>
+            <div class="heat-legend">
+              Less
+              <span class="heat-cell l0"></span>
+              <span class="heat-cell l1"></span>
+              <span class="heat-cell l2"></span>
+              <span class="heat-cell l3"></span>
+              <span class="heat-cell l4"></span>
+              More
+            </div>
+          </div>
+          <div class="dash-card-body" id="activityHeatmap" style="padding:18px 20px">
+            <div class="loading"><span class="spinner"></span>Loading…</div>
+          </div>
+        </div>
+
+        <div class="dash-card">
+          <div class="dash-card-hd"><h3>Top Projects</h3></div>
+          <div class="dash-card-body" id="activityProjects" style="padding:14px 20px">
+            <div class="loading"><span class="spinner"></span>Loading…</div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- AI ASSISTANT (full page) -->
