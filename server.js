@@ -22,7 +22,12 @@ http.createServer((req, res) => {
       res.end(data);
     });
   } else {
-    const file = path.join(DIR, urlPath);
+    // Resolve the requested path and make sure it stays inside DIR (no ../ escapes).
+    const decoded = decodeURIComponent(urlPath);
+    const file = path.normalize(path.join(DIR, decoded));
+    if (file !== DIR && !file.startsWith(DIR + path.sep)) {
+      res.writeHead(403); res.end('Forbidden'); return;
+    }
     fs.readFile(file, (err, data) => {
       if (err) { res.writeHead(404); res.end('Not found'); return; }
       const ext = file.split('.').pop();

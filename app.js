@@ -120,7 +120,10 @@ function sdPopulate(id, items) {
   _sdData[id] = items;
   const list = document.getElementById(id + '_list');
   list.innerHTML = items.length
-    ? items.map(it => `<div class="sd-opt" data-value="${it.value}" onclick="sdSelect('${id}','${it.value}',this)">${it.label}</div>`).join('')
+    ? items.map(it => {
+        const v = esc(String(it.value)).replace(/'/g, '&#39;');
+        return `<div class="sd-opt" data-value="${v}" onclick="sdSelect('${id}','${v}',this)">${esc(it.label)}</div>`;
+      }).join('')
     : '<div class="sd-empty">No items</div>';
 }
 function sdToggle(id) {
@@ -186,16 +189,210 @@ function updateLogLabel() {
     (_logYear === now.getFullYear() && _logMonth === now.getMonth()) ? 'hidden' : 'visible';
 }
 
+// ── BANGLADESH HOLIDAYS ──
+// Loaded from /holidays.json (govt gazette data). key: 'YYYY-MM-DD' → name.
+let BD_HOLIDAYS = {};
+let _holidaysLoaded = false;
+
+async function loadHolidays() {
+  if (_holidaysLoaded) return;
+  try {
+    const res = await fetch('/holidays.json', { cache: 'no-cache' });
+    const data = await res.json();
+    BD_HOLIDAYS = data.holidays || {};
+  } catch { BD_HOLIDAYS = {}; }
+  _holidaysLoaded = true;
+}
+
+let _calYear, _calMonth; // currently displayed month
+
+function calDateKey(y, m, d) {
+  return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+function renderCalendar() {
+  const now = new Date();
+  if (_calYear === undefined) { _calYear = now.getFullYear(); _calMonth = now.getMonth(); }
+  const y = _calYear, m = _calMonth;
+  const labelEl = document.getElementById('calLabel');
+  if (labelEl) labelEl.textContent = new Date(y, m, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  const firstDay = new Date(y, m, 1).getDay(); // 0=Sun
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const todayKey = calDateKey(now.getFullYear(), now.getMonth(), now.getDate());
+
+  const dow = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+    .map(d => `<div class="cal-dow">${d}</div>`).join('');
+
+  let cells = '';
+  for (let i = 0; i < firstDay; i++) cells += '<div class="cal-cell blank"></div>';
+  for (let d = 1; d <= daysInMonth; d++) {
+    const key = calDateKey(y, m, d);
+    const dateObj = new Date(y, m, d);
+    const holiday = BD_HOLIDAYS[key];
+    const offDay = isWeekend(dateObj, d, y, m); // Friday + user-configured Saturdays
+    const isToday = key === todayKey;
+
+    const cls = ['cal-cell'];
+    let label = '', titleTxt = '';
+    if (holiday) {
+      cls.push('holiday');           // red — named govt/public holiday
+      label = holiday;
+      titleTxt = holiday;
+    } else if (offDay) {
+      cls.push('offday');            // red — weekly off (Friday / chosen Saturday)
+      label = 'Day Off';
+      titleTxt = dateObj.getDay() === 5 ? 'Friday · weekly off' : 'Saturday · day off';
+    }
+    if (isToday) cls.push('today');
+
+    const title = titleTxt ? ` title="${titleTxt.replace(/"/g, '&quot;')}"` : '';
+    const name = label ? `<div class="cal-hname">${label}</div>` : '';
+    cells += `<div class="${cls.join(' ')}"${title}><div class="cal-num">${d}</div>${name}</div>`;
+  }
+
+  // Upcoming holidays (next 3 from today, within this year+next)
+  const upcoming = Object.entries(BD_HOLIDAYS)
+    .filter(([k, v]) => v && /^\d{4}-\d{2}-\d{2}$/.test(k) && k >= todayKey)
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .slice(0, 3)
+    .map(([k, v]) => {
+      const dObj = new Date(k + 'T00:00:00');
+      const days = Math.round((dObj - new Date(todayKey + 'T00:00:00')) / 86400000);
+      const when = days === 0 ? 'today' : days === 1 ? 'tomorrow' : `in ${days} days`;
+      return `<div class="cal-up-row">
+        <span class="cal-up-date">${dObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+        <span class="cal-up-name">${v}</span>
+        <span class="cal-up-when">${when}</span>
+      </div>`;
+    }).join('');
+
+  document.getElementById('dashCalendar').innerHTML = `
+    <div class="cal-grid">
+      <div class="cal-dow-row">${dow}</div>
+      <div class="cal-cells">${cells}</div>
+    </div>
+    <div class="cal-legend">
+      <span class="cal-leg"><span class="cal-leg-sw holiday"></span>Public holiday</span>
+      <span class="cal-leg"><span class="cal-leg-sw offday"></span>Weekly day off</span>
+      <span class="cal-leg"><span class="cal-leg-sw today"></span>Today</span>
+    </div>
+    ${upcoming ? `<div class="cal-upcoming"><div class="cal-up-title">Upcoming Holidays</div>${upcoming}</div>` : ''}`;
+}
+
+// Convert a number to Bengali digits (e.g. 17 → "১৭")
+function toBn(n) {
+  const d = ['০','১','২','৩','৪','৫','৬','৭','৮','৯'];
+  return String(n).replace(/\d/g, x => d[+x]);
+}
+
+// Gregorian → Bangla (Bongabdo) date using Bangladesh's revised (2019) calendar.
+// Month lengths: Boishakh–Bhadro 31, Ashwin–Choitro 30, Falgun 29/30 (leap).
+const BN_MONTHS = ['বৈশাখ','জ্যৈষ্ঠ','আষাঢ়','শ্রাবণ','ভাদ্র','আশ্বিন','কার্তিক','অগ্রহায়ণ','পৌষ','মাঘ','ফাল্গুন','চৈত্র'];
+function toBanglaDate(greg) {
+  const y = greg.getFullYear();
+  const isLeap = (y % 4 === 0 && y % 100 !== 0) || (y % 400 === 0);
+  // Bangla year starts on 14 April. Anchor: 14 April of the current Gregorian year = 1 Boishakh.
+  const boishakh1 = new Date(y, 3, 14); // month index 3 = April
+  let bnYear, startOfBnYear;
+  if (greg >= boishakh1) { bnYear = y - 593; startOfBnYear = boishakh1; }
+  else { bnYear = y - 594; startOfBnYear = new Date(y - 1, 3, 14); }
+  // days elapsed since 1 Boishakh
+  let dayOfBnYear = Math.floor((greg.setHours(0,0,0,0) - new Date(startOfBnYear).setHours(0,0,0,0)) / 86400000);
+  const lens = [31,31,31,31,31,30,30,30,30,30, (isLeap ? 30 : 29), 30];
+  let mi = 0;
+  while (mi < 12 && dayOfBnYear >= lens[mi]) { dayOfBnYear -= lens[mi]; mi++; }
+  const day = dayOfBnYear + 1;
+  return `${toBn(day)} ${BN_MONTHS[mi]} ${toBn(bnYear)}`;
+}
+
+// Gregorian → Hijri (Islamic) via Intl; approximate (moon-based, ±1 day).
+function toHijriDate(greg) {
+  try {
+    // Intl already appends the era ("AH") — don't add it again.
+    return new Intl.DateTimeFormat('en-US-u-ca-islamic-umalqura',
+      { day: 'numeric', month: 'long', year: 'numeric' }).format(greg);
+  } catch { return ''; }
+}
+
+function dayOfYear(d) {
+  const start = new Date(d.getFullYear(), 0, 0);
+  return Math.floor((d - start) / 86400000);
+}
+function isoWeek(d) {
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const day = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  return Math.ceil((((t - yearStart) / 86400000) + 1) / 7);
+}
+
+// Today's working status from BD_HOLIDAYS + weekly-off config.
+function dayStatus(d) {
+  const key = calDateKey(d.getFullYear(), d.getMonth(), d.getDate());
+  if (BD_HOLIDAYS[key]) return { cls: 'holiday', text: BD_HOLIDAYS[key] };
+  if (isWeekend(d, d.getDate(), d.getFullYear(), d.getMonth())) {
+    return { cls: 'off', text: d.getDay() === 5 ? 'Day Off · Friday' : 'Day Off · Saturday' };
+  }
+  return { cls: 'work', text: 'Working day' };
+}
+
+let _clockTimer = null;
+function startClock() {
+  const tick = () => {
+    const el = document.getElementById('clockTime');
+    if (!el) return; // dashboard not mounted
+    const n = new Date();
+    let h = n.getHours();
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    const mm = String(n.getMinutes()).padStart(2, '0');
+    const ss = String(n.getSeconds()).padStart(2, '0');
+    el.innerHTML = `${h}:${mm}<span class="clock-sec">${ss}</span>`;
+    document.getElementById('clockAmPm').textContent = ampm;
+    document.getElementById('clockDay').textContent  = n.toLocaleDateString('en-US', { weekday: 'long' });
+    document.getElementById('clockDate').textContent = n.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
+
+    const bn = document.getElementById('clockBangla');
+    if (bn) {
+      bn.textContent = toBanglaDate(new Date(n));
+      document.getElementById('clockHijri').textContent = toHijriDate(n);
+      document.getElementById('clockDoy').textContent = `Day ${dayOfYear(n)} · Week ${isoWeek(n)}`;
+      const st = dayStatus(n);
+      const badge = document.getElementById('clockStatus');
+      badge.textContent = st.text;
+      badge.className = 'clock-status ' + st.cls;
+    }
+  };
+  tick();
+  if (_clockTimer) clearInterval(_clockTimer);
+  _clockTimer = setInterval(tick, 1000);
+}
+
+function changeCalMonth(delta) {
+  if (_calYear === undefined) { const n = new Date(); _calYear = n.getFullYear(); _calMonth = n.getMonth(); }
+  _calMonth += delta;
+  if (_calMonth < 0) { _calMonth = 11; _calYear--; }
+  else if (_calMonth > 11) { _calMonth = 0; _calYear++; }
+  renderCalendar();
+}
+
+function calToday() {
+  const n = new Date();
+  _calYear = n.getFullYear(); _calMonth = n.getMonth();
+  renderCalendar();
+}
+
 // ── DASHBOARD ──
 function renderDashOpenIssues(open) {
   document.getElementById('kpiOpen').textContent = open.length;
   const recent = open.slice(0, 8);
   document.getElementById('dashIssues').innerHTML = recent.length ? recent.map(i => {
     const proj = i.references?.full?.split('#')[0] || i.web_url.split('/-/')[0].split('/').slice(-2).join('/');
-    const labels = (i.labels||[]).map(l=>`<span class="chip" style="background:var(--surface3);color:var(--text2);border:1px solid var(--border2);font-size:10px;padding:1px 6px">${l}</span>`).join('');
-    return `<div class="dash-issue-row" onclick="window.open('${i.web_url}','_blank')">
+    const labels = (i.labels||[]).map(l=>`<span class="chip" style="background:var(--surface3);color:var(--text2);border:1px solid var(--border2);font-size:10px;padding:1px 6px">${esc(l)}</span>`).join('');
+    return `<div class="dash-issue-row" onclick="window.open('${encodeURI(i.web_url)}','_blank')">
       <div class="dash-issue-num">#${i.iid}</div>
-      <div><div class="dash-issue-title">${i.title}</div><div class="dash-issue-proj" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">${proj}${labels ? '<span style="color:var(--border2)">·</span>'+labels : ''}</div></div>
+      <div><div class="dash-issue-title">${esc(i.title)}</div><div class="dash-issue-proj" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">${esc(proj)}${labels ? '<span style="color:var(--border2)">·</span>'+labels : ''}</div></div>
     </div>`;
   }).join('') : '<div class="empty"><div class="eicon">✕</div><p>No open issues</p></div>';
 }
@@ -206,6 +403,10 @@ async function loadDashboard() {
   const greet = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
   document.getElementById('dashGreet').textContent = `${greet}, ${ME?.name?.split(' ')[0] || ''} 👋`;
   document.getElementById('dashDate').textContent = now.toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+
+  // Live clock + holiday calendar
+  startClock();
+  loadHolidays().then(renderCalendar);
 
   // ── Instant render from cache (if present), then refresh in the background ──
   const cachedOpen = gc('openIssues');
@@ -406,24 +607,25 @@ function renderIssues(issues) {
     const ts = issue.time_stats;
     const timeTxt = ts?.human_time_spent || (ts?.total_time_spent > 0 ? fmtH(ts.total_time_spent) : null);
     const isOpen  = issue.state === 'opened';
+    const titleAttr = esc(issue.title).replace(/'/g, '&#39;');
     return `<div class="issue-card">
       <div class="ic-top">
         <div class="ic-num">#${issue.iid}</div>
         <div class="ic-body">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
-            <div class="ic-title" onclick="window.open('${issue.web_url}','_blank')">${issue.title}</div>
-            <span class="chip chip-purple" id="time-chip-${issue.project_id}-${issue.iid}" style="flex-shrink:0">${timeTxt ? '⏱ ' + timeTxt : ''}</span>
+            <div class="ic-title" onclick="window.open('${encodeURI(issue.web_url)}','_blank')">${esc(issue.title)}</div>
+            <span class="chip chip-purple" id="time-chip-${issue.project_id}-${issue.iid}" style="flex-shrink:0">${timeTxt ? '⏱ ' + esc(timeTxt) : ''}</span>
           </div>
           <div class="ic-meta">
-            <span class="chip chip-blue">🔍 ${pname}</span>
-            ${(issue.labels||[]).map(l=>`<span class="chip" style="background:var(--surface3);color:var(--text2);border:1px solid var(--border2)">${l}</span>`).join('')}
+            <span class="chip chip-blue">🔍 ${esc(pname)}</span>
+            ${(issue.labels||[]).map(l=>`<span class="chip" style="background:var(--surface3);color:var(--text2);border:1px solid var(--border2)">${esc(l)}</span>`).join('')}
           </div>
         </div>
       </div>
       <div class="ic-actions">
-        <button class="btn btn-ghost btn-sm" onclick="openTimeModal(${issue.project_id},${issue.iid},'${issue.title.replace(/'/g,"\\'")}')">⏱ Log Time</button>
+        <button class="btn btn-ghost btn-sm" onclick="openTimeModal(${issue.project_id},${issue.iid},'${titleAttr}')">⏱ Log Time</button>
         ${isOpen ? `<button class="btn btn-danger btn-sm" onclick="openCloseModal(${issue.project_id},${issue.iid})">✕ Close</button>` : ''}
-        <a href="${issue.web_url}" target="_blank" style="margin-left:auto"><button class="btn btn-ghost btn-sm">← View</button></a>
+        <a href="${encodeURI(issue.web_url)}" target="_blank" style="margin-left:auto"><button class="btn btn-ghost btn-sm">← View</button></a>
       </div>
     </div>`;
   }).join('');
@@ -571,7 +773,7 @@ function openQuickLog() {
   sel.innerHTML = '<option value="">— Select an open issue —</option>' +
     open.map(i => {
       const proj = i.references?.full?.split('#')[0] || i.web_url.split('/-/')[0].split('/').slice(-2).join('/');
-      return `<option value="${i.project_id}::${i.iid}">#${i.iid} — ${i.title} (${proj})</option>`;
+      return `<option value="${i.project_id}::${i.iid}">#${i.iid} — ${esc(i.title)} (${esc(proj)})</option>`;
     }).join('');
   document.getElementById('quickDuration').value = '';
   document.getElementById('quickDate').value = new Date().toISOString().slice(0, 10);
@@ -589,6 +791,9 @@ async function submitQuickLog() {
   if (!dur) return toast('Enter a duration', true);
   const [pid, iid] = val.split('::');
   const shouldClose = document.getElementById('quickClose').checked;
+  const btn = document.getElementById('quickLogSubmitBtn');
+  const orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Logging…'; }
   try {
     await logTimeGQL(pid, iid, dur, date, summary);
     if (shouldClose) {
@@ -601,6 +806,7 @@ async function submitQuickLog() {
     cacheClear();
     loadDashboard();
   } catch(e) { toast('Error: ' + e.message, true); }
+  finally { if (btn) { btn.disabled = false; btn.innerHTML = orig; } }
 }
 
 // ── TIME MODAL ──
@@ -854,6 +1060,7 @@ function resetCreateForm() {
   addTimeRow();
 }
 
+let _creatingIssue = false;
 async function createIssue() {
   const pid   = document.getElementById('createProject').value;
   const title = document.getElementById('createTitle').value.trim();
@@ -861,6 +1068,11 @@ async function createIssue() {
   const shouldClose = document.getElementById('createAndClose')?.checked;
   if (!pid)   return toast('Select a project', true);
   if (!title) return toast('Enter a title', true);
+  if (_creatingIssue) return; // guard against double-submit
+  _creatingIssue = true;
+  const btn = document.getElementById('createSubmitBtn');
+  const orig = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Creating…'; }
   const body = { title, description: desc };
   if (_assignMe && ME) body.assignee_ids = [ME.id];
   try {
@@ -884,10 +1096,19 @@ async function createIssue() {
     } else {
       toast(`✓ Created #${issue.iid}${loggedAny?' · time logged':''}`);
     }
+    // Make the new issue available immediately (before any refresh):
+    // add it to the in-memory list so issue dropdowns show it right away.
+    if (!shouldClose && Array.isArray(allIssues) && !allIssues.some(i => i.project_id === issue.project_id && i.iid === issue.iid)) {
+      allIssues.unshift(issue);
+    }
     resetCreateForm();
     cacheClear();
     showPage('issues'); loadMyIssues();
   } catch(e) { toast('Error: ' + e.message, true); }
+  finally {
+    _creatingIssue = false;
+    if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+  }
 }
 
 // ── SHARED TIME HELPERS ──
@@ -995,7 +1216,7 @@ async function loadMonthlyLog() {
           const timeTd = entries.length === 1
             ? `<td class="ltime" style="white-space:nowrap">${fmtH(daySecs)} ${timeBadge}</td>`
             : `<td style="color:var(--text3);font-size:13px;text-align:right">${fmtH(e.secs)}</td>`;
-          rows += `<tr class="${cls}">${dc}<td style="color:var(--text3);font-size:13px">${e.proj}</td><td><a class="llink" href="${e.url}" target="_blank">#${e.iid}</a> <span style="color:var(--text)">${e.title}</span></td>${timeTd}${ac}</tr>`;
+          rows += `<tr class="${cls}">${dc}<td style="color:var(--text3);font-size:13px">${esc(e.proj)}</td><td><a class="llink" href="${encodeURI(e.url)}" target="_blank">#${e.iid}</a> <span style="color:var(--text)">${esc(e.title)}</span></td>${timeTd}${ac}</tr>`;
         });
         if (entries.length > 1) rows += `<tr class="ldaytotal"><td></td><td></td><td style="color:var(--text3);font-size:12px;font-weight:700;text-align:right">DAY TOTAL</td><td class="ltime" style="white-space:nowrap">${fmtH(daySecs)} ${timeBadge}</td><td></td></tr>`;
       }
@@ -1093,7 +1314,7 @@ async function loadTimeReport() {
         <tbody>${projEntries.map(([proj, secs]) => {
           const pct = Math.round((secs / maxProjSec) * 100);
           return `<tr>
-            <td style="font-weight:600;color:var(--text)">${proj}</td>
+            <td style="font-weight:600;color:var(--text)">${esc(proj)}</td>
             <td style="color:var(--purple);font-weight:800;font-size:16px;white-space:nowrap">${fmtH(secs)}</td>
             <td>
               <div style="height:8px;background:var(--surface2);border-radius:4px;overflow:hidden">
@@ -1146,6 +1367,7 @@ async function loadActivityIfNeeded() {
   if (cached) {
     document.getElementById('activityHeatmap').innerHTML  = cached.heat;
     document.getElementById('activityProjects').innerHTML = cached.projects || '';
+    document.getElementById('activityCommits').innerHTML  = cached.commitLog || '';
     applyActivityKpis(cached.kpis);
     return;
   }
@@ -1186,6 +1408,7 @@ async function loadActivity() {
     const projectCommits = {}; // project_id -> commits pushed (for Top Projects)
     let commits = 0, pushEvents = 0;
 
+    const pushedProjects = new Set(); // project_ids that had a push in the window
     events.forEach(ev => {
       const key = localDateKey(ev.created_at);
       // keep only events inside the rolling window [startKey, todayKey]
@@ -1194,11 +1417,58 @@ async function loadActivity() {
       const action = ev.action_name || 'updated';
       if (action === 'pushed' || action === 'pushed to' || action === 'pushed new') {
         pushEvents++;
-        const c = ev.push_data?.commit_count || 1;
-        commits += c;
-        if (ev.project_id) projectCommits[ev.project_id] = (projectCommits[ev.project_id] || 0) + c;
+        if (ev.project_id) pushedProjects.add(ev.project_id);
       }
     });
+
+    // Real commit counts: query each pushed project's commits API and keep only
+    // those authored by ME (push_data.commit_count over-counts merges/others' commits).
+    // Skip merge commits (2+ parents) — those aren't hand-written work.
+    //
+    // Matching: git author identity often differs from the GitLab account
+    // (different email/name in local git config). We match against a set of
+    // identity tokens: explicit ones from Settings (CFG.git_identities), else
+    // auto-derived from the account (username/email-local-part/name).
+    const identityTokens = (CFG.git_identities || '')
+      .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+    if (!identityTokens.length) {
+      if (ME.username) identityTokens.push(ME.username.toLowerCase());
+      if (ME.email) identityTokens.push(ME.email.split('@')[0].toLowerCase());
+      if (ME.name) identityTokens.push(ME.name.toLowerCase());
+    }
+    const mineMatches = (c) => {
+      if (Array.isArray(c.parent_ids) && c.parent_ids.length > 1) return false;
+      if (/^Merge (branch|remote-tracking|pull request)/i.test(c.title || c.message || '')) return false;
+      const hay = `${c.author_email || ''} ${c.author_name || ''}`.toLowerCase();
+      return identityTokens.some(t => hay.includes(t));
+    };
+    const sinceIso = start.toISOString();
+    const untilIso = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString();
+    const myCommits = []; // {pid, title, createdAt, url} — for the recent-commits log
+    await Promise.all([...pushedProjects].map(async (pid) => {
+      try {
+        const cs = await reqAll(`/projects/${pid}/repository/commits?since=${sinceIso}&until=${untilIso}&all=true`);
+        // `all=true` returns commits from every branch, so the same commit can
+        // appear more than once — dedupe by commit id within this project.
+        const seen = new Set();
+        const mine = cs.filter(c => {
+          if (!mineMatches(c)) return false;
+          const id = c.id || c.short_id;
+          if (id && seen.has(id)) return false;
+          if (id) seen.add(id);
+          return true;
+        });
+        if (mine.length > 0) {
+          projectCommits[pid] = mine.length; commits += mine.length;
+          mine.forEach(c => myCommits.push({
+            pid,
+            title: c.title || c.message || '(no message)',
+            createdAt: c.created_at || c.committed_date || c.authored_date,
+            url: c.web_url || ''
+          }));
+        }
+      } catch { /* project may not expose commits — skip */ }
+    }));
 
     // KPIs
     const activeDays = Object.keys(dayCounts).length;
@@ -1234,12 +1504,62 @@ async function loadActivity() {
     const projects = buildActivityProjects(projectCommits);
     document.getElementById('activityProjects').innerHTML = projects;
 
-    sc('render_activity', { heat, projects, kpis });
+    // Recent commits log — last 7 days, grouped by date, with links
+    const commitLog = buildActivityCommitLog(myCommits);
+    document.getElementById('activityCommits').innerHTML = commitLog;
+
+    sc('render_activity', { heat, projects, commitLog, kpis });
   } catch (e) {
     document.getElementById('activityHeatmap').innerHTML =
       `<div class="empty"><div class="eicon">⚠️</div><p>${esc(e.message)}</p></div>`;
     document.getElementById('activityProjects').innerHTML = '';
+    document.getElementById('activityCommits').innerHTML = '';
   }
+}
+
+// Last 7 days of my commits, grouped by date, newest first, with links.
+function buildActivityCommitLog(myCommits) {
+  const now = new Date();
+  const cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6); // last 7 days incl. today
+  const recent = myCommits
+    .filter(c => c.createdAt && new Date(c.createdAt) >= cutoff)
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  if (!recent.length) {
+    return '<div class="empty" style="padding:20px"><div class="eicon">📝</div><p>No commits in the last 7 days</p></div>';
+  }
+
+  // group by local date
+  const groups = {};
+  recent.forEach(c => { (groups[localDateKey(c.createdAt)] ||= []).push(c); });
+
+  const todayKey = localDateKey(now);
+  const ydayKey = localDateKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1));
+
+  return Object.entries(groups).map(([dateKey, list]) => {
+    const dObj = new Date(dateKey + 'T00:00:00');
+    let dateLabel = dObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    if (dateKey === todayKey) dateLabel = 'Today';
+    else if (dateKey === ydayKey) dateLabel = 'Yesterday';
+
+    const rows = list.map(c => {
+      const time = new Date(c.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      const proj = projName(c.pid).split('/').pop().trim();
+      const titleAttr = c.url ? `href="${c.url}" target="_blank" rel="noopener"` : '';
+      const tag = c.url ? 'a' : 'div';
+      return `<${tag} class="cl-row" ${titleAttr}>
+        <span class="cl-bullet"></span>
+        <span class="cl-msg">${esc(c.title)}</span>
+        <span class="cl-proj">${esc(proj)}</span>
+        <span class="cl-time">${time}</span>
+      </${tag}>`;
+    }).join('');
+
+    return `<div class="cl-group">
+      <div class="cl-date"><span>${dateLabel}</span><span class="cl-count">${list.length}</span></div>
+      <div class="cl-rows">${rows}</div>
+    </div>`;
+  }).join('');
 }
 
 function buildActivityProjects(projectCommits) {
@@ -1465,7 +1785,7 @@ function renderSummaryByAssignee() {
     <div style="padding:12px 0;border-bottom:1px solid var(--border2)">
       <div style="font-weight:700;font-size:13px;margin-bottom:6px">${esc(g.name)} <span style="color:var(--text3);font-weight:500">[${g.issues.length} Issue${g.issues.length === 1 ? '' : 's'}]</span></div>
       <div style="display:flex;flex-wrap:wrap;gap:8px">
-        ${g.issues.map(i => `<a href="${i.web_url}" target="_blank" class="ai-link" style="font-size:12px">#${i.iid}</a>`).join('')}
+        ${g.issues.map(i => `<a href="${encodeURI(i.web_url)}" target="_blank" class="ai-link" style="font-size:12px">#${i.iid}</a>`).join('')}
       </div>
     </div>`).join('');
 }
@@ -1491,7 +1811,37 @@ function buildSummaryByAssigneeText() {
     '',
     `Assignee Summary ${dateStr} at ${timeStr}`,
     '',
-    ...groups.map((g, idx) => `${idx + 1}.${g.name} — ${g.issues.length} Open Issue${g.issues.length === 1 ? '' : 's'} (${g.issues.map(i => '#' + i.iid).join(', ')})`)
+    ...groups.map((g, idx) => `${idx + 1}. ${g.name} — ${g.issues.length} Open Issue${g.issues.length === 1 ? '' : 's'} (${g.issues.map(i => '#' + i.iid).join(', ')})`)
+  ];
+  return lines.join('\n');
+}
+
+// Discord variant: same content, but each #iid becomes a clickable markdown link.
+function buildSummaryByAssigneeDiscord() {
+  const groups = _summaryAssignees.filter(a => _summaryCheckedKeys.has(a.key)).map(a => {
+    const issues = _summaryOpenIssues.filter(i =>
+      (i.assignees && i.assignees.length ? i.assignees : [null]).some(x => summaryAssigneeKey(x) === a.key)
+    );
+    return { ...a, issues };
+  }).filter(g => g.issues.length);
+
+  if (!groups.length) return null;
+
+  const pid = document.getElementById('summaryProject').value;
+  const proj = allProjects.find(p => String(p.id) === String(pid));
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+  const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+  const lines = [
+    `**Project Name : ${proj?.name || ''}**`,
+    '',
+    `Assignee Summary ${dateStr} at ${timeStr}`,
+    '',
+    ...groups.map((g, idx) => {
+      const links = g.issues.map(i => i.web_url ? `[#${i.iid}](<${i.web_url}>)` : `#${i.iid}`).join(', ');
+      return `${idx + 1}. ${g.name} — ${g.issues.length} Open Issue${g.issues.length === 1 ? '' : 's'} (${links})`;
+    })
   ];
   return lines.join('\n');
 }
@@ -1515,7 +1865,7 @@ function sendSummaryToWhatsapp() {
 }
 
 async function sendSummaryToDiscord() {
-  const text = buildSummaryByAssigneeText();
+  const text = buildSummaryByAssigneeDiscord();
   if (!text) return toast('No open issues for the selected assignees', true);
   const webhook = (CFG.discord_webhook || '').trim();
   if (!webhook) return toast('Add a Discord Webhook URL in Settings first', true);
@@ -2361,6 +2711,7 @@ function openSettings() {
   document.getElementById('cfgGroqKey').value     = CFG.groq_key     || '';
   document.getElementById('cfgGroqModel').value   = CFG.groq_model   || 'llama-3.3-70b-versatile';
   document.getElementById('cfgDiscordWebhook').value = CFG.discord_webhook || '';
+  const gi = document.getElementById('cfgGitIdentities'); if (gi) gi.value = CFG.git_identities || '';
   aiProviderToggle();
   document.getElementById('settingsModal').classList.add('open');
   setTimeout(() => document.getElementById(CFG.token ? 'cfgUrl' : 'cfgToken').focus(), 100);
@@ -2392,7 +2743,8 @@ async function saveSettings() {
   const groq_key     = document.getElementById('cfgGroqKey').value.trim();
   const groq_model   = document.getElementById('cfgGroqModel').value;
   const discord_webhook = document.getElementById('cfgDiscordWebhook').value.trim();
-  saveCfg({ url: url || DEFAULT_URL, token, sat_off, sat_hours, day_hours, gemini_key, gemini_model, ai_provider, groq_key, groq_model, discord_webhook });
+  const git_identities = (document.getElementById('cfgGitIdentities')?.value || '').trim();
+  saveCfg({ url: url || DEFAULT_URL, token, sat_off, sat_hours, day_hours, gemini_key, gemini_model, ai_provider, groq_key, groq_model, discord_webhook, git_identities });
   API   = (CFG.url || DEFAULT_URL).replace(/\/$/, '') + '/api/v4';
   TOKEN = CFG.token;
   closeModal('settingsModal');
@@ -2487,7 +2839,7 @@ async function connect(initPage = 'dashboard') {
   try {
     ME = await req('/user');
     document.getElementById('userInfo').innerHTML =
-      `<img src="${ME.avatar_url}" style="width:26px;height:26px;border-radius:50%"><span class="user-pill-name">${ME.name}</span>`;
+      `<img src="${encodeURI(ME.avatar_url || '')}" style="width:26px;height:26px;border-radius:50%"><span class="user-pill-name">${esc(ME.name || '')}</span>`;
     await loadProjects();
     showPage(initPage, false);
     history.replaceState({ page: initPage }, '', PAGE_URLS[initPage] || '/dashboard');

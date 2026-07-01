@@ -150,6 +150,36 @@
           </div>
         </div>
       </div>
+
+      <div class="cal-row">
+        <div class="dash-card clock-card">
+          <div id="dashClock" class="clock">
+            <div class="clock-time" id="clockTime">--:--</div>
+            <div class="clock-ampm" id="clockAmPm"></div>
+            <div class="clock-day" id="clockDay"></div>
+            <div class="clock-date" id="clockDate"></div>
+            <div class="clock-status work" id="clockStatus"></div>
+            <div class="clock-extra">
+              <div class="clock-xrow"><span class="clock-xlbl">বাংলা</span><span class="clock-xval" id="clockBangla">—</span></div>
+              <div class="clock-xrow"><span class="clock-xlbl">হিজরি</span><span class="clock-xval" id="clockHijri">—</span></div>
+              <div class="clock-xrow"><span class="clock-xlbl">Progress</span><span class="clock-xval" id="clockDoy">—</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dash-card">
+          <div class="dash-card-hd">
+            <h3>Holiday Calendar <span style="font-size:12px;color:var(--text3);font-weight:400">🇧🇩 Bangladesh</span></h3>
+            <div class="cal-nav">
+              <button class="cal-nav-btn" onclick="changeCalMonth(-1)" aria-label="Previous month">‹</button>
+              <span id="calLabel" class="cal-label">—</span>
+              <button class="cal-nav-btn" onclick="changeCalMonth(1)" aria-label="Next month">›</button>
+              <button class="btn btn-ghost btn-sm" onclick="calToday()" style="margin-left:6px">Today</button>
+            </div>
+          </div>
+          <div class="dash-card-body" id="dashCalendar" style="padding:14px 18px"></div>
+        </div>
+      </div>
     </div>
 
     <!-- MY ISSUES -->
@@ -269,13 +299,17 @@
 
       <!-- SINGLE MODE -->
       <div id="nlePane1">
-        <div class="nle-layout">
-          <!-- LEFT: Issue Details -->
-          <div class="nle-card">
-            <div class="nle-card-hd">
-              <span class="nle-card-icon">📋</span>
-              <span class="nle-card-title">Issue Details</span>
+        <div class="nle-sheet">
+          <!-- Section: Issue Details -->
+          <div class="nle-section">
+            <div class="nle-section-hd">
+              <span class="nle-section-icon">📋</span>
+              <div>
+                <div class="nle-section-title">Issue Details</div>
+                <div class="nle-section-desc">What are you logging work against?</div>
+              </div>
             </div>
+
             <div class="form-group">
               <label class="form-label">Project <span class="req">*</span></label>
               <div class="sd-wrap" id="sdProject">
@@ -290,54 +324,70 @@
               </div>
               <input type="hidden" id="createProject">
             </div>
+
             <div class="form-group">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+              <div class="form-label-row">
                 <label class="form-label" style="margin:0">Issue Title <span class="req">*</span></label>
-                <button id="aiGenBtn2" class="btn btn-ghost btn-sm" onclick="aiGenerateIssue('createTitle','createDesc','aiGenBtn2')" style="font-size:11px;gap:4px;color:var(--purple)">✦ AI Generate</button>
+                <button id="aiGenBtn2" class="nle-ai-btn" onclick="aiGenerateIssue('createTitle','createDesc','aiGenBtn2')">✦ AI Generate</button>
               </div>
               <input type="text" class="form-input" id="createTitle" placeholder="Brief idea or keywords… AI will expand it">
             </div>
-            <div class="form-group">
-              <label class="form-label">Description <span style="color:var(--text3);font-weight:400">(optional)</span></label>
+
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">Description <span class="form-optional">optional</span></label>
               <textarea class="form-input" id="createDesc" rows="3" placeholder="Steps, context, links…"></textarea>
             </div>
-            <div class="form-group">
-              <label class="form-label">Assignee</label>
-              <div class="assignee-row">
-                <div class="assignee-me" id="assigneeMe">
-                  <span class="assignee-avatar" id="assigneeAvatar">?</span>
-                  <span id="assigneeName">Loading…</span>
-                </div>
-                <button class="btn btn-ghost btn-sm" onclick="toggleAssignee()" id="assigneeToggle">✕ Remove</button>
+          </div>
+
+          <!-- Section: Assignee -->
+          <div class="nle-section">
+            <div class="nle-section-hd">
+              <span class="nle-section-icon">👤</span>
+              <div>
+                <div class="nle-section-title">Assignee</div>
+                <div class="nle-section-desc">Who owns this issue</div>
               </div>
             </div>
+            <div class="assignee-row">
+              <div class="assignee-me" id="assigneeMe">
+                <span class="assignee-avatar" id="assigneeAvatar">?</span>
+                <span id="assigneeName">Loading…</span>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="toggleAssignee()" id="assigneeToggle">✕ Remove</button>
+            </div>
           </div>
-          <!-- RIGHT: Time Entries -->
-          <div class="nle-card">
-            <div class="nle-card-hd">
-              <span class="nle-card-icon">⏱</span>
-              <span class="nle-card-title">Time Entries</span>
-              <span class="nle-card-sub">optional</span>
+
+          <!-- Section: Time Entries -->
+          <div class="nle-section">
+            <div class="nle-section-hd">
+              <span class="nle-section-icon">⏱</span>
+              <div>
+                <div class="nle-section-title">Time Entries <span class="form-optional">optional</span></div>
+                <div class="nle-section-desc">Log hours you spent on this</div>
+              </div>
             </div>
             <div id="timeEntryList"></div>
             <button class="nle-add-row" onclick="addTimeRow()">
               <span style="font-size:18px;line-height:1">+</span> Add Time Entry
             </button>
             <div class="nle-time-summary" id="timeSummary" style="display:none">
-              <span style="color:var(--text3);font-size:12px">TOTAL</span>
+              <span style="color:var(--text3);font-size:12px;letter-spacing:.5px">TOTAL</span>
               <span id="timeSummaryVal" style="color:var(--blue);font-weight:800;font-size:18px">0h</span>
             </div>
-            <div class="nle-close-opt" id="nleCloseOpt">
-              <label class="nle-check-row">
-                <input type="checkbox" id="createAndClose" style="width:15px;height:15px;accent-color:var(--red);cursor:pointer;flex-shrink:0">
-                <span>Close issue after creating &amp; logging</span>
-              </label>
-            </div>
+          </div>
+
+          <!-- Section: Options -->
+          <div class="nle-close-opt" id="nleCloseOpt">
+            <label class="nle-check-row">
+              <input type="checkbox" id="createAndClose" style="width:16px;height:16px;accent-color:var(--red);cursor:pointer;flex-shrink:0">
+              <span>Close issue right after creating</span>
+            </label>
           </div>
         </div>
+
         <div class="nle-footer">
           <button class="btn btn-ghost" onclick="resetCreateForm()">… Clear Form</button>
-          <button class="btn btn-primary" onclick="createIssue()">✦ Submit Entry</button>
+          <button class="btn btn-primary" id="createSubmitBtn" onclick="createIssue()">✓ Submit Entry</button>
         </div>
       </div>
 
@@ -484,6 +534,16 @@
           <div class="dash-card-body" id="activityProjects" style="padding:14px 20px">
             <div class="loading"><span class="spinner"></span>Loading…</div>
           </div>
+        </div>
+      </div>
+
+      <div class="dash-card" style="margin-top:16px">
+        <div class="dash-card-hd">
+          <h3>Recent Commits</h3>
+          <span style="font-size:12px;color:var(--text3)">last 7 days</span>
+        </div>
+        <div class="dash-card-body" id="activityCommits" style="padding:8px 20px 16px">
+          <div class="loading"><span class="spinner"></span>Loading…</div>
         </div>
       </div>
     </div>
@@ -662,7 +722,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('quickLogModal')">Cancel</button>
-      <button class="btn btn-primary" onclick="submitQuickLog()">Log Time →</button>
+      <button class="btn btn-primary" id="quickLogSubmitBtn" onclick="submitQuickLog()">Log Time →</button>
     </div>
   </div>
 </div>
@@ -917,10 +977,16 @@
 
     <div style="height:1px;background:var(--border);margin:20px 0"></div>
 
-    <div class="form-group" style="margin:0">
+    <div class="form-group">
       <label class="form-label">Discord Webhook URL</label>
       <input type="text" class="form-input" id="cfgDiscordWebhook" placeholder="https://discord.com/api/webhooks/...">
       <div style="font-size:11px;color:var(--text3);margin-top:6px">Used by the "Send to Discord" button on the Summary page. Create one in your Discord channel: Settings → Integrations → Webhooks.</div>
+    </div>
+
+    <div class="form-group" style="margin:0">
+      <label class="form-label">My Git Identities <span style="color:var(--text3);font-weight:400">(for My Activity)</span></label>
+      <input type="text" class="form-input" id="cfgGitIdentities" placeholder="mdsadi.ossp@gmail.com, Sadi">
+      <div style="font-size:11px;color:var(--text3);margin-top:6px">Comma-separated emails or names your commits are authored with. Used to find <b>your</b> commits on the My Activity page. Leave empty to auto-detect from your account (username / email / name).</div>
     </div>
 
     <div class="modal-footer">
