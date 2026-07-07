@@ -1,6 +1,6 @@
 # MyLabLogTracker (My Codelab Dashboard)
 
-A premium, feature-rich developer utility and time-tracking single-page application (SPA) designed to integrate seamlessly with your GitLab instance (defaults to Codelab). It features automated log generation from Git commits, real-time workload estimation, an AI assistant, and auto-refresh mechanisms.
+A premium, feature-rich developer utility and time-tracking single-page application (SPA) designed to integrate seamlessly with your Codelab instance . It features automated log generation from Git commits, real-time workload estimation, an AI assistant, and auto-refresh mechanisms.
 
 ---
 
