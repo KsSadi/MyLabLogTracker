@@ -90,7 +90,12 @@ async function reqAll(path) {
   while (true) {
     const sep = path.includes('?') ? '&' : '?';
     const res = await fetch(`${API}${path}${sep}per_page=100&page=${page}`, { headers: { 'PRIVATE-TOKEN': TOKEN } });
-    if (!res.ok) break;
+    // ponytail: a failed first page must throw, not return [] — an empty list is
+    // indistinguishable from "no issues" and silently poisons the daymap cache.
+    if (!res.ok) {
+      if (page === 1) throw new Error(`GitLab ${res.status}: ${res.statusText}`);
+      break;
+    }
     const data = await res.json();
     if (!data.length) break;
     out = out.concat(data);
@@ -449,12 +454,6 @@ function cacheClear() {
 }
 
 // ── SHARED: build dayMap from notes (single source of truth) ──
-let _cachedDayMap = null;
-
-async function fetchIssueTimelogs(issue) {
-  // timelogs API not supported on this GitLab version — notes are the source of truth
-  return [];
-}
 
 async function buildDayMap(year, month) {
   const now = new Date();
@@ -464,57 +463,43 @@ async function buildDayMap(year, month) {
   const hit = gc(cacheKey);
   if (hit) return hit;
 
-  // Fetch issues updated on or after the start of the target month.
-  // This catches current-month issues and past-month issues that were later updated.
-  const monthStart = new Date(year, month, 1).toISOString();
-  const issues = await reqAll(`/issues?assignee_username=${ME.username}&state=all&scope=all&updated_after=${monthStart}`);
+  const pad2 = n => String(n).padStart(2, '0');
+  const startDate = `${year}-${pad2(month + 1)}-01`;
+  const endDate   = `${year}-${pad2(month + 1)}-${pad2(new Date(year, month + 1, 0).getDate())}`;
 
-  // Fetch both notes and per-issue timelogs in parallel
-  const results = await Promise.all(issues.map(async (issue) => {
-    const proj = issue.references?.full?.split('#')[0] || issue.web_url.split('/-/')[0].split('/').slice(-2).join('/');
-    const [notesData, timelogs] = await Promise.all([
-      fetchTimeNotes(issue),
-      fetchIssueTimelogs(issue)
-    ]);
-    return { issue, proj, notes: notesData.notes, timelogs };
-  }));
+  // Query timelogs BY USER, not by issue assignee. Time is regularly logged
+  // against issues assigned to someone else; the old assignee-scoped issue list
+  // silently dropped those hours (e.g. Aug 2026 read as 0h when 16h existed).
+  // This is also one request instead of a per-issue notes+timelogs fan-out.
+  const d = await gql(`{
+    timelogs(username: "${ME.username}", startDate: "${startDate}", endDate: "${endDate}") {
+      nodes { spentAt timeSpent issue { iid title webUrl projectId } }
+    }
+  }`);
 
   const dayMap = {};
+  for (const n of (d?.timelogs?.nodes || [])) {
+    if (!n.issue || !n.timeSpent) continue;
+    // spentAt carries a real offset (…+06:00); build the LOCAL date so an
+    // entry never lands on the neighbouring day.
+    const c = new Date(n.spentAt);
+    if (isNaN(c)) continue;
+    const dateStr = `${c.getFullYear()}-${pad2(c.getMonth() + 1)}-${pad2(c.getDate())}`;
 
-  for (const { issue, proj, notes, timelogs } of results) {
-    // Per-date accumulator for this issue — timelogs API is authoritative source
-    // timelogs entries have exact spent_at; notes are fallback for entries without timelog API support
-    const tlDates = new Set(); // track which dates timelogs covered
-    const dateMap = {}; // dateStr -> secs
+    const iid = Number(n.issue.iid); // GraphQL returns iid as a string
+    const pid = n.issue.projectId;
+    const proj = n.issue.webUrl.split('/-/')[0].split('/').slice(-2).join('/');
 
-    // 1. Timelogs API entries (GitLab UI / direct API entries)
-    for (const tl of timelogs) {
-      if (!tl.dateStr) continue;
-      const [ty, tm] = tl.dateStr.split('-').map(Number);
-      if (ty !== year || tm !== month + 1) continue;
-      dateMap[tl.dateStr] = (dateMap[tl.dateStr] || 0) + tl.secs;
-      tlDates.add(tl.dateStr);
-    }
-
-    // 2. Notes entries — only add for dates NOT already covered by timelogs (avoid double-count)
-    for (const note of notes) {
-      const p = parseTimeNote(note.body);
-      if (!p) continue;
-      const [ny, nm] = p.dateStr.split('-').map(Number);
-      if (ny !== year || nm !== month + 1) continue;
-      if (tlDates.has(p.dateStr)) continue; // timelogs already has this date
-      dateMap[p.dateStr] = (dateMap[p.dateStr] || 0) + p.secs;
-    }
-
-    for (const [dateStr, secs] of Object.entries(dateMap)) {
-      if (!dayMap[dateStr]) dayMap[dateStr] = [];
-      const ex = dayMap[dateStr].find(e => e.iid === issue.iid && e.pid === issue.project_id);
-      if (ex) ex.secs += secs;
-      else dayMap[dateStr].push({ iid: issue.iid, title: issue.title, url: issue.web_url, proj, pid: issue.project_id, secs });
-    }
+    if (!dayMap[dateStr]) dayMap[dateStr] = [];
+    const ex = dayMap[dateStr].find(e => e.iid === iid && e.pid === pid);
+    if (ex) ex.secs += n.timeSpent;
+    else dayMap[dateStr].push({ iid, title: n.issue.title, url: n.issue.webUrl, proj, pid, secs: n.timeSpent });
   }
 
-  sc(cacheKey, dayMap);
+  // ponytail: never cache an empty map. gc() only invalidates across a month
+  // boundary, but the key is already month-scoped — so a transient auth/network
+  // failure caching {} would pin "everything missing" for the whole tab session.
+  if (Object.keys(dayMap).length) sc(cacheKey, dayMap);
   return dayMap;
 }
 
@@ -538,29 +523,70 @@ async function loadMonthlyLogData() {
   document.getElementById('kpiDays').textContent    = workedDays;
   document.getElementById('kpiMissing').textContent = missingDays;
 
-  // This week's bar chart
+  // This week's bar chart. Early in a month the last 7 days reach back into the
+  // previous one, so pull that month's dayMap too rather than dropping the days.
+  const prev = new Date(year, month - 1, 1);
+  const prevMap = (new Date(now).setDate(now.getDate() - 6) < new Date(year, month, 1))
+    ? await buildDayMap(prev.getFullYear(), prev.getMonth())
+    : {};
+
   const weekBars = [];
   for (let back = 6; back >= 0; back--) {
     const d = new Date(now); d.setDate(now.getDate() - back);
-    if (d.getMonth() !== month || d.getDate() > todayDate) continue;
-    const key = `${year}-${String(month+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-    const daySecs = (dayMap[key] || []).reduce((s, e) => s + e.secs, 0);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const src = d.getMonth() === month ? dayMap : prevMap;
+    const entries = src[key] || [];
+    const daySecs = entries.reduce((s, e) => s + e.secs, 0);
     const dateStr = d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' });
-    const isOff = isWeekend(d, d.getDate(), year, month);
-    weekBars.push({ dateStr, daySecs, isOff });
+    const isOff = isWeekend(d, d.getDate(), d.getFullYear(), d.getMonth());
+    const targetSecs = targetFor(d, d.getDate(), d.getFullYear(), d.getMonth());
+    weekBars.push({ dateStr, daySecs, isOff, targetSecs, entries });
   }
-  const maxSecs = Math.max(...weekBars.map(b => b.daySecs), 1);
-  document.getElementById('dashWeek').innerHTML = weekBars.map(b => {
-    const pct = Math.round((b.daySecs / maxSecs) * 100);
-    const isMissing = !b.isOff && b.daySecs === 0;
-    return `<div class="day-row">
-      <div class="day-date">${b.dateStr}</div>
-      <div class="day-bar-wrap">
-        <div class="day-bar" style="width:${pct}%;background:${isMissing?'var(--red)':(b.isOff&&b.daySecs===0)?'var(--border2)':'var(--blue)'}"></div>
+  // Bars are scaled to the DAILY TARGET, not to the week's max: a 4h day should
+  // read as half a bar, not as a full one just because it was the busiest day.
+  // Overtime overflows past the target line, capped at the track width.
+  const weekSecs  = weekBars.reduce((s, b) => s + b.daySecs, 0);
+  const targetSum = weekBars.reduce((s, b) => s + b.targetSecs, 0);
+  const metDays   = weekBars.filter(b => b.targetSecs > 0 && b.daySecs >= b.targetSecs).length;
+  const dueDays   = weekBars.filter(b => b.targetSecs > 0).length;
+
+  document.getElementById('dashWeek').innerHTML = `
+    <div class="wk-head">
+      <div>
+        <span class="wk-total">${fmtH(weekSecs)}</span>
+        <span class="wk-total-sub">of ${fmtH(targetSum)} target</span>
       </div>
-      <div class="day-hours">${b.daySecs > 0 ? fmtH(b.daySecs) : (isMissing ? '<span style="color:var(--red);font-size:11px">—</span>' : '')}</div>
+      <span class="wk-met">${metDays}/${dueDays} days met</span>
+    </div>
+    <div class="wk-rows">
+    ${weekBars.map(b => {
+      const pct    = b.targetSecs > 0 ? Math.min(Math.round((b.daySecs / b.targetSecs) * 100), 100) : 0;
+      const met    = b.targetSecs > 0 && b.daySecs >= b.targetSecs;
+      const missing = !b.isOff && b.daySecs === 0;
+      const over   = b.targetSecs > 0 && b.daySecs > b.targetSecs;
+
+      // State drives BOTH the fill and a text label — never colour alone.
+      const state = b.isOff ? 'off' : missing ? 'missing' : over ? 'over' : met ? 'met-day' : 'short';
+      const label = b.isOff   ? 'Off day'
+                  : missing   ? 'Not logged'
+                  : over      ? `${fmtH(b.daySecs)} · +${fmtH(b.daySecs - b.targetSecs)}`
+                  : met       ? fmtH(b.daySecs)
+                              : `${fmtH(b.daySecs)} · ${fmtH(b.targetSecs - b.daySecs)} short`;
+
+      const tip = b.isOff ? `${b.dateStr} — off day`
+                : missing ? `${b.dateStr} — nothing logged (target ${fmtH(b.targetSecs)})`
+                : `${b.dateStr} — ${fmtH(b.daySecs)} of ${fmtH(b.targetSecs)}` +
+                  (b.entries.length ? '\n' + b.entries.map(e => `#${e.iid} ${e.title}  ${fmtH(e.secs)}`).join('\n') : '');
+
+      return `<div class="wk-row wk-${state}" tabindex="0" title="${esc(tip)}">
+        <div class="wk-day">${b.dateStr}</div>
+        <div class="wk-track">
+          <div class="wk-fill" style="width:${pct}%"></div>
+        </div>
+        <div class="wk-val">${label}</div>
+      </div>`;
+    }).join('')}
     </div>`;
-  }).join('');
 }
 
 // ── MY ISSUES ──
@@ -1112,24 +1138,11 @@ async function createIssue() {
 }
 
 // ── SHARED TIME HELPERS ──
-function parseTimeNote(body) {
-  const m = body.match(/added (.+?) of time spent at (\d{4}-\d{2}-\d{2})/);
-  if (!m) return null;
-  let secs = 0; const t = m[1];
-  const mo = t.match(/(\d+)mo/); if (mo) secs += +mo[1] * 4 * 5 * 8 * 3600; // 1mo = 4w
-  const w  = t.match(/(\d+)w/);  if (w)  secs += +w[1]  * 5 * 8 * 3600;
-  const d  = t.match(/(\d+)d/);  if (d)  secs += +d[1]  * 8 * 3600;
-  const h  = t.match(/(\d+)h/);  if (h)  secs += +h[1]  * 3600;
-  const mi = t.match(/(\d+)m(?!o)/); if (mi) secs += +mi[1] * 60;
-  return { dateStr: m[2], secs };
-}
-async function fetchTimeNotes(issue) {
-  try {
-    const notes = await reqAll(`/projects/${issue.project_id}/issues/${issue.iid}/notes`);
-    const proj  = issue.references?.full?.split('#')[0] || issue.web_url.split('/-/')[0].split('/').slice(-2).join('/');
-    return { issue, proj, notes: notes.filter(n => n.body?.includes('time spent')) };
-  } catch { return { issue, proj: '', notes: [] }; }
-}
+// Accepts a note object (preferred) or a raw body string.
+// GitLab writes the date only when one was explicitly set:
+//   "added 8h of time spent at 2026-08-12"   ← our app, /spend with a date
+//   "added 8h of time spent"                 ← Codelab UI quick entry, date = note creation day
+//   "subtracted 2h of time spent at ..."     ← counts negative
 function getSatNum(d, year, month) {
   // returns which Saturday number (1-4) the given date is, or 0 if not Saturday
   const dateObj = new Date(year, month, d);
@@ -1146,6 +1159,16 @@ function isWeekend(dateObj, d, year, month) {
     return getSatOff().includes(satNum); // off if user marked it off
   }
   return false;
+}
+
+// Daily target in seconds: an off day has none, a working Saturday its own
+// shorter target, everything else the standard day. Shared by the dashboard
+// week chart and the monthly log so the two can never disagree.
+function targetFor(dateObj, d, year, month) {
+  if (isWeekend(dateObj, d, year, month)) return 0;
+  const satNum = getSatNum(d, year, month);
+  const isWorkSat = satNum > 0 && !getSatOff().includes(satNum);
+  return (isWorkSat ? (CFG.sat_hours ?? 7) : (CFG.day_hours ?? 8)) * 3600;
 }
 
 // ── MONTHLY LOG ──
@@ -1194,10 +1217,7 @@ async function loadMonthlyLog() {
       } else {
         totalSecs += daySecs;
         worked++;
-        // target: working Saturday = 7h, other workdays = 8h, off day = no target
-        const satNum     = getSatNum(d, year, month);
-        const isWorkSat  = satNum > 0 && !getSatOff().includes(satNum);
-        const targetSecs = wkend ? 0 : (isWorkSat ? (CFG.sat_hours ?? 7)*3600 : (CFG.day_hours ?? 8)*3600);
+        const targetSecs = targetFor(dateObj, d, year, month);
         const shortfall   = targetSecs > 0 && daySecs < targetSecs;
         const overtime    = targetSecs > 0 && daySecs > targetSecs;
         const deficit     = shortfall ? targetSecs - daySecs : 0;
@@ -1211,7 +1231,7 @@ async function loadMonthlyLog() {
         const cls = today ? 'ldata ltoday' : 'ldata';
         entries.forEach((e, idx) => {
           const dc = idx === 0 ? `<td class="ldate" rowspan="${entries.length}">${dateFmt}</td>` : '';
-          const ac = idx === 0 ? `<td rowspan="${entries.length}" style="text-align:right;white-space:nowrap;vertical-align:middle"><button class="log-missing-btn" onclick="openMissingLogOnIssue('${key}','${e.project_id}','${e.iid}')">+ Log Time</button></td>` : '';
+          const ac = idx === 0 ? `<td rowspan="${entries.length}" style="text-align:right;white-space:nowrap;vertical-align:middle"><button class="log-missing-btn" onclick="openMissingLogOnIssue('${key}','${e.pid}','${e.iid}')">+ Log Time</button></td>` : '';
           // single entry: show total+badge in time cell; multi entry: show per-entry time, total in DAY TOTAL row
           const timeTd = entries.length === 1
             ? `<td class="ltime" style="white-space:nowrap">${fmtH(daySecs)} ${timeBadge}</td>`
@@ -1269,29 +1289,17 @@ async function loadTimeReport() {
   if (!ME) return;
   document.getElementById('timeList').innerHTML = '<div class="loading"><span class="spinner"></span>Loading…</div>';
   const year = _timeYear, month = _timeMonth;
-  const monthStart = new Date(year, month, 1).toISOString();
   try {
-    const issues  = await reqAll(`/issues?assignee_username=${ME.username}&state=all&scope=all&updated_after=${monthStart}`);
-    document.getElementById('timeList').innerHTML = '<div class="loading"><span class="spinner"></span>Parsing notes…</div>';
-    const results = await Promise.all(issues.map(fetchTimeNotes));
-    const map = {};
-    for (const { issue, proj, notes } of results) {
-      const key = `${issue.project_id}-${issue.iid}`;
-      for (const note of notes) {
-        const p = parseTimeNote(note.body);
-        if (!p) continue;
-        const [ny, nm] = p.dateStr.split('-').map(Number);
-        if (ny !== year || nm !== month + 1) continue;
-        if (!map[key]) map[key] = { issue, proj, secs: 0, last: p.dateStr };
-        map[key].secs += p.secs;
-        if (p.dateStr > map[key].last) map[key].last = p.dateStr;
-      }
-    }
-    // Group by project
+    // Reuse buildDayMap: it already queries timelogs by user (not by assignee),
+    // so this page no longer misses time logged on other people's issues either.
+    const dayMap = await buildDayMap(year, month);
+
+    // Group by project. buildDayMap is already scoped to the target month.
     const projMap = {};
-    for (const { proj, secs } of Object.values(map)) {
-      if (!projMap[proj]) projMap[proj] = 0;
-      projMap[proj] += secs;
+    for (const entries of Object.values(dayMap)) {
+      for (const e of entries) {
+        projMap[e.proj] = (projMap[e.proj] || 0) + e.secs;
+      }
     }
     const projEntries = Object.entries(projMap).sort((a, b) => b[1] - a[1]);
     const monthSec = projEntries.reduce((s, [, v]) => s + v, 0);

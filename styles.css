@@ -207,12 +207,46 @@ body {
 .dash-issue-title { font-size: 13px; font-weight: 500; color: var(--text); flex: 1; }
 .dash-issue-proj { font-size: 11px; color: var(--text3); margin-top: 2px; }
 
+/* Generic bar row — still used by the commits-per-project chart. */
 .day-row { display: flex; align-items: center; gap: 12px; padding: 10px 20px; border-bottom: 1px solid var(--border); }
 .day-row:last-child { border-bottom: none; }
 .day-date { font-size: 12px; font-weight: 700; color: var(--text2); width: 80px; flex-shrink: 0; }
 .day-bar-wrap { flex: 1; height: 6px; background: var(--surface3); border-radius: 3px; overflow: hidden; }
 .day-bar { height: 100%; background: var(--blue); border-radius: 3px; transition: width .4s ease; }
 .day-hours { font-size: 12px; font-weight: 700; color: var(--purple); width: 44px; text-align: right; flex-shrink: 0; }
+
+/* ── Dashboard week chart ── */
+.wk-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  padding: 14px 20px 12px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.wk-total { font-size: 24px; font-weight: 800; color: var(--text); letter-spacing: -.02em; }
+.wk-total-sub, .wk-met { font-size: 12px; color: var(--text2); }
+.wk-met { font-weight: 700; }
+
+.wk-rows { padding: 4px 0; }
+.wk-row { display: flex; align-items: center; gap: 12px; padding: 9px 20px;
+  border-radius: 8px; transition: background .15s ease; }
+.wk-row:hover, .wk-row:focus-visible { background: var(--surface2); outline: none; }
+.wk-row:focus-visible { box-shadow: inset 0 0 0 2px var(--blue); }
+
+.wk-day { font-size: 12px; font-weight: 700; color: var(--text2); width: 62px; flex-shrink: 0; }
+/* The track is the daily target; a full bar means the target was met. */
+.wk-track { flex: 1; height: 8px; background: var(--surface3); border-radius: 4px; overflow: hidden; }
+.wk-fill { height: 100%; border-radius: 4px; background: var(--blue); transition: width .45s ease; }
+.wk-val { font-size: 12px; font-weight: 700; color: var(--text2); width: 116px;
+  text-align: right; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+
+/* State carries a text label too — never colour alone. */
+.wk-met-day .wk-fill { background: var(--green); }
+/* Overtime reads as met at the bar; the "+Xh" text label carries the excess.
+   A second hue here would be a low-contrast pair doing work text already does. */
+.wk-over .wk-fill { background: var(--green); }
+.wk-over .wk-val  { color: var(--purple); }
+.wk-short .wk-fill   { background: var(--blue); }
+.wk-missing .wk-track { background: var(--red-bg); }
+.wk-missing .wk-val   { color: var(--red); }
+.wk-off .wk-track     { background: repeating-linear-gradient(135deg,
+  var(--surface3) 0 5px, transparent 5px 10px); }
+.wk-off .wk-day, .wk-off .wk-val { color: var(--text3); font-weight: 600; }
 .day-missing { font-size: 11px; color: var(--red); font-style: italic; }
 
 /* ── FILTER ROW ── */
