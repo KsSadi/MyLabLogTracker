@@ -48,3 +48,68 @@ for (let back = 6; back >= 0; back--) { const d = new Date(now); d.setDate(now.g
 assert.strictEqual(days, 7, 'a 7-day window must always yield 7 bars');
 
 console.log('daymap: all checks passed');
+
+// ── duration parser ──
+// Guards every logged entry: a string it misreads as 0 silently logs nothing.
+const ps = src.indexOf('function parseDurToSecs');
+const parseDurToSecs = new Function(src.slice(ps, src.indexOf('\n}', ps) + 2) + '; return parseDurToSecs;')();
+const H = 3600;
+[['4h', 4*H], ['2h30m', 2*H + 30*60], ['45m', 45*60], ['1d', 8*H],
+ ['0.5h', 1800], ['  8h  ', 8*H],
+ ['4', 4*H],      // bare number = hours, else it parses to 0 and logs nothing
+ ['1.5', 5400],
+ ['', 0], ['abc', 0]
+].forEach(([input, want]) =>
+  assert.strictEqual(parseDurToSecs(input), want, `parseDurToSecs(${JSON.stringify(input)})`));
+
+// Only one parser may exist — a second copy drifts out of sync with this one.
+assert.ok(!/function parseSecsFromStr/.test(src), 'the duplicate duration parser must stay deleted');
+
+console.log('duration parser: all checks passed');
+
+// ── public holidays are not missing days ──
+// isWeekend gates the "— missing —" row and the daily target. A gazetted holiday
+// falling on a weekday must count as off, or Eid reads as a day you skipped work.
+assert.ok(/if \(BD_HOLIDAYS\[dateKey\(year, month, d\)\]\) return true;/.test(src),
+  'isWeekend must treat a gazetted holiday as a non-working day');
+assert.ok((src.match(/await loadHolidays\(\)/g) || []).length >= 2,
+  'the log and dashboard must await loadHolidays() — otherwise BD_HOLIDAYS is empty on a direct page load');
+
+const holidays = require('./holidays.json').holidays;
+assert.ok(Object.keys(holidays).length > 0, 'holidays.json must not be empty');
+// Every key must be a real YYYY-MM-DD, since dateKey() builds the same shape.
+for (const k of Object.keys(holidays)) {
+  assert.ok(/^\d{4}-\d{2}-\d{2}$/.test(k), `bad holiday key: ${k}`);
+  const [y, m, d] = k.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  assert.strictEqual(dt.getDate(), d, `not a real date: ${k}`);
+}
+
+// Aug 2026 carries two weekday holidays — the case that surfaced this bug.
+assert.strictEqual(holidays['2026-08-05'], 'July Mass-uprising Day');
+assert.strictEqual(holidays['2026-08-26'], 'Eid-e-Milad-un-Nabi');
+
+console.log('holidays: all checks passed');
+
+// ── cached HTML must never be the only render ──
+// The bug: loadMonthlyLogIfNeeded painted sessionStorage HTML and returned, so a
+// logic change (holidays) never reached anyone with a warm cache. Each *IfNeeded
+// may paint from cache, but must still call its loader to refresh behind it.
+for (const [fn, loader] of [
+  ['loadMonthlyLogIfNeeded', 'loadMonthlyLog'],
+  ['loadTimeReportIfNeeded', 'loadTimeReport'],
+  ['loadActivityIfNeeded',   'loadActivity'],
+]) {
+  const i = src.indexOf('function ' + fn);
+  assert.ok(i > 0, `${fn} not found`);
+  const body = src.slice(i, src.indexOf('\n}', i));
+  assert.ok(body.includes(loader + '('), fn + ' must call ' + loader + '() to refresh');
+  // The loader call must be REACHABLE: an early return inside the cache-hit
+  // branch is the exact shape of the bug and still 'contains' the call.
+  const callAt = body.indexOf(loader + '(');
+  const retAt  = body.indexOf('return;');
+  assert.ok(retAt === -1 || retAt > callAt,
+    fn + ' must not early-return before calling ' + loader + '()');
+}
+
+console.log('cache refresh: all checks passed');

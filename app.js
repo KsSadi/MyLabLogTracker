@@ -53,6 +53,10 @@ async function gql(query) {
 
 function parseDurToSecs(s) {
   if (!s) return 0;
+  s = String(s).trim();
+  // A bare number means hours ("4" = 4h) — otherwise it parses to 0 and the
+  // entry silently logs nothing.
+  if (/^\d+(?:\.\d+)?$/.test(s)) return Math.round(parseFloat(s) * 3600);
   let secs = 0;
   const d = s.match(/(\d+(?:\.\d+)?)d/i); if (d) secs += parseFloat(d[1]) * 8 * 3600;
   const h = s.match(/(\d+(?:\.\d+)?)h/i); if (h) secs += parseFloat(h[1]) * 3600;
@@ -504,6 +508,7 @@ async function buildDayMap(year, month) {
 }
 
 async function loadMonthlyLogData() {
+  await loadHolidays(); // holidays gate 'missing day' — must be loaded first
   const now = new Date();
   const year = now.getFullYear(), month = now.getMonth();
   const todayDate = now.getDate();
@@ -1028,14 +1033,46 @@ function addTimeRow() {
   div.className = 'time-entry-row';
   div.id = id;
   div.innerHTML = `
-    <input type="text" placeholder="2h30m / 1h" oninput="updateTimeSummary()" class="ter-dur" id="${id}_dur">
-    <input type="date" class="ter-date" id="${id}_date" value="${today}">
-    <input type="text" placeholder="What did you work on? (optional)" id="${id}_summary">
-    <button class="ter-remove" onclick="removeTimeRow('${id}')" title="Remove">×</button>`;
+    <div class="ter-main">
+      <div class="ter-field">
+        <input type="text" placeholder="4h, 2h30m, 45m…" oninput="updateTimeSummary()"
+               class="ter-dur" id="${id}_dur" aria-label="Duration"
+               aria-describedby="${id}_echo">
+        <span class="ter-echo" id="${id}_echo" aria-live="polite"></span>
+      </div>
+      <input type="date" class="ter-date" id="${id}_date" value="${today}"
+             max="${today}" onchange="updateTimeSummary()" aria-label="Date worked">
+      <input type="text" class="ter-note" placeholder="What did you work on? (optional)" id="${id}_summary" aria-label="Summary">
+      <button class="ter-remove" onclick="removeTimeRow('${id}')" title="Remove entry" aria-label="Remove entry">×</button>
+    </div>
+    <div class="ter-quick">
+      ${[['1h','1h'],['2h','2h'],['4h','4h'],['8h','8h']].map(([v,l]) =>
+        `<button type="button" class="ter-chip" onclick="terSetDur('${id}','${v}')">${l}</button>`).join('')}
+      <span class="ter-sep"></span>
+      <button type="button" class="ter-chip" onclick="terSetDate('${id}',0)">Today</button>
+      <button type="button" class="ter-chip" onclick="terSetDate('${id}',1)">Yesterday</button>
+    </div>`;
   document.getElementById('timeEntryList').appendChild(div);
   div.querySelector('.ter-dur').focus();
   updateTimeSummary();
 }
+
+// Quick-fill helpers. Both re-run the summary so the total and the echo stay
+// truthful no matter how the value got there.
+function terSetDur(id, val) {
+  const el = document.getElementById(id + '_dur');
+  el.value = val;
+  el.focus();
+  updateTimeSummary();
+}
+function terSetDate(id, daysBack) {
+  const d = new Date();
+  d.setDate(d.getDate() - daysBack);
+  document.getElementById(id + '_date').value =
+    `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  updateTimeSummary();
+}
+
 
 function removeTimeRow(id) {
   const el = document.getElementById(id);
@@ -1044,29 +1081,51 @@ function removeTimeRow(id) {
   if (document.getElementById('timeEntryList').children.length === 0) addTimeRow();
 }
 
-function parseSecsFromStr(s) {
-  if (!s) return 0;
-  let secs = 0;
-  const d = s.match(/(\d+(?:\.\d+)?)d/i); if (d) secs += parseFloat(d[1]) * 8 * 3600;
-  const h = s.match(/(\d+(?:\.\d+)?)h/i); if (h) secs += parseFloat(h[1]) * 3600;
-  const m = s.match(/(\d+)m/i);           if (m) secs += parseInt(m[1]) * 60;
-  return secs;
-}
 
 function updateTimeSummary() {
-  const rows = document.querySelectorAll('.ter-dur');
   let total = 0;
-  rows.forEach(r => { total += parseSecsFromStr(r.value.trim()); });
+  const dates = new Set();
+
+  document.querySelectorAll('.time-entry-row').forEach(row => {
+    const dur  = row.querySelector('.ter-dur');
+    const echo = row.querySelector('.ter-echo');
+    const raw  = dur.value.trim();
+    const secs = parseDurToSecs(raw);
+    total += secs;
+
+    const dateEl = row.querySelector('.ter-date');
+    if (secs > 0 && dateEl?.value) dates.add(dateEl.value);
+
+    // Echo what the app actually understood, so a typo is visible before submit
+    // rather than after. Empty is neutral — not an error until you submit.
+    if (!raw)        { echo.textContent = '';               echo.className = 'ter-echo'; }
+    else if (!secs)  { echo.textContent = "can't read that"; echo.className = 'ter-echo bad'; }
+    else             { echo.textContent = '= ' + fmtH(secs); echo.className = 'ter-echo ok'; }
+    dur.classList.toggle('invalid', !!raw && !secs);
+  });
+
   const sumEl = document.getElementById('timeSummary');
   const valEl = document.getElementById('timeSummaryVal');
-  if (total > 0) {
-    const h = Math.floor(total / 3600), m = Math.floor((total % 3600) / 60);
-    valEl.textContent = m > 0 ? `${h}h ${m}m` : `${h}h`;
-    sumEl.style.display = 'flex';
+  if (total <= 0) { sumEl.style.display = 'none'; return; }
+
+  valEl.textContent = fmtH(total);
+  sumEl.style.display = 'flex';
+
+  // Compare against the target, but only when every entry lands on ONE day —
+  // a multi-day batch has no single target to measure against.
+  const noteEl = document.getElementById('timeSummaryNote');
+  if (!noteEl) return;
+  if (dates.size === 1) {
+    const [y, m, d] = [...dates][0].split('-').map(Number);
+    const target = targetFor(new Date(y, m - 1, d), d, y, m - 1);
+    if (target <= 0)          noteEl.innerHTML = '<span class="tsum-off">off day</span>';
+    else if (total >= target) noteEl.innerHTML = `<span class="tsum-ok">✓ meets ${fmtH(target)} target</span>`;
+    else                      noteEl.innerHTML = `<span class="tsum-short">${fmtH(target - total)} short of ${fmtH(target)}</span>`;
   } else {
-    sumEl.style.display = 'none';
+    noteEl.innerHTML = `<span class="tsum-multi">${dates.size} days</span>`;
   }
 }
+
 
 function resetCreateForm() {
   document.getElementById('createProject').value = '';
@@ -1109,7 +1168,7 @@ async function createIssue() {
     for (const row of rows) {
       const dur     = row.querySelector('.ter-dur').value.trim();
       const date    = row.querySelector('input[type="date"]').value;
-      const summary = row.querySelector('input[type="text"]:not(.ter-dur)').value.trim();
+      const summary = row.querySelector('.ter-note').value.trim();
       if (!dur) continue;
       await logTimeGQL(pid, issue.iid, dur, date, summary);
       // summary passed via GraphQL timelogCreate
@@ -1151,7 +1210,15 @@ function getSatNum(d, year, month) {
   for (let x = 1; x <= d; x++) if (new Date(year, month, x).getDay() === 6) cnt++;
   return cnt;
 }
+function dateKey(year, month, d) {
+  return `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+// A non-working day: the weekly off pattern OR a gazetted public holiday.
+// Every caller that asks "was work expected on this day?" goes through here, so
+// holidays are never counted as missing days.
 function isWeekend(dateObj, d, year, month) {
+  if (BD_HOLIDAYS[dateKey(year, month, d)]) return true;
   const day = dateObj.getDay();
   if (day === 5) return true; // Friday always off
   if (day === 6) {
@@ -1159,6 +1226,11 @@ function isWeekend(dateObj, d, year, month) {
     return getSatOff().includes(satNum); // off if user marked it off
   }
   return false;
+}
+
+// The holiday name for a date, or '' — used to label the row.
+function holidayName(year, month, d) {
+  return BD_HOLIDAYS[dateKey(year, month, d)] || '';
 }
 
 // Daily target in seconds: an off day has none, a working Saturday its own
@@ -1188,9 +1260,10 @@ function changeLogMonth(delta) {
   loadMonthlyLog();
 }
 
-async function loadMonthlyLog() {
+async function loadMonthlyLog(quiet = false) {
   if (!ME) return;
-  document.getElementById('logTable').innerHTML = '<div class="loading"><span class="spinner"></span>Loading…</div>';
+  await loadHolidays(); // holidays gate 'missing day' — must be loaded first
+  if (!quiet) document.getElementById('logTable').innerHTML = '<div class="loading"><span class="spinner"></span>Loading…</div>';
   const now = new Date();
   const year = _logYear, month = _logMonth;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -1212,7 +1285,11 @@ async function loadMonthlyLog() {
       const dateFmt  = dateObj.toLocaleDateString('en-GB', { weekday:'short', day:'2-digit', month:'short' });
 
       if (entries.length === 0) {
-        if (wkend) rows += `<tr class="lweekend"><td class="ldate">${dateFmt}</td><td colspan="2" style="color:var(--text3);font-style:italic">Weekend</td><td></td><td></td></tr>`;
+        if (wkend) {
+          // Name the holiday rather than calling a Wednesday a "weekend".
+          const hol = holidayName(year, month, d);
+          rows += `<tr class="lweekend"><td class="ldate">${dateFmt}</td><td colspan="2" class="lofflbl">${hol ? '🎉 ' + esc(hol) : 'Weekend'}</td><td></td><td></td></tr>`;
+        }
         else { missing++; rows += `<tr class="lmissing"><td class="ldate">${dateFmt}</td><td colspan="2"><span style="color:var(--red);font-style:italic">— missing —</span></td><td></td><td style="text-align:right;white-space:nowrap"><button class="log-missing-btn" onclick="openMissingLog('${key}')">+ Log Time</button></td></tr>`; }
       } else {
         totalSecs += daySecs;
@@ -1285,9 +1362,9 @@ function updateTimeLabel() {
     (_timeYear === now.getFullYear() && _timeMonth === now.getMonth()) ? 'hidden' : 'visible';
 }
 
-async function loadTimeReport() {
+async function loadTimeReport(quiet = false) {
   if (!ME) return;
-  document.getElementById('timeList').innerHTML = '<div class="loading"><span class="spinner"></span>Loading…</div>';
+  if (!quiet) document.getElementById('timeList').innerHTML = '<div class="loading"><span class="spinner"></span>Loading…</div>';
   const year = _timeYear, month = _timeMonth;
   try {
     // Reuse buildDayMap: it already queries timelogs by user (not by assignee),
@@ -1340,23 +1417,24 @@ async function loadTimeReport() {
 
 // ── UTILS ──
 function loadTimeReportIfNeeded() {
+  // Paint from cache, then always refresh — see loadMonthlyLogIfNeeded.
   const html = gc('render_time');
   if (html) {
     document.getElementById('statMonth').textContent  = gc('stat_month')  || '—';
     document.getElementById('statIssues').textContent = gc('stat_issues') || '—';
     document.getElementById('timeList').innerHTML = html;
     updateTimeLabel();
-  } else {
-    loadTimeReport();
   }
+  loadTimeReport(!!html);
 }
 function loadMonthlyLogIfNeeded() {
+  // Paint the cached HTML for an instant view, then ALWAYS re-render behind it.
+  // Serving the cache alone pins stale markup for the whole tab session — a
+  // logic change (holidays, targets) would never reach a user who had the page
+  // open before it shipped.
   const html = gc('render_log');
-  if (html) {
-    document.getElementById('logTable').innerHTML = html;
-  } else {
-    loadMonthlyLog();
-  }
+  if (html) document.getElementById('logTable').innerHTML = html;
+  loadMonthlyLog(!!html); // quiet refresh — don't flash a spinner over real content
 }
 
 function fmtH(s) {
@@ -1371,15 +1449,15 @@ function localDateKey(dateInput) {
 }
 
 async function loadActivityIfNeeded() {
+  // Paint from cache, then always refresh — see loadMonthlyLogIfNeeded.
   const cached = gc('render_activity');
   if (cached) {
     document.getElementById('activityHeatmap').innerHTML  = cached.heat;
     document.getElementById('activityProjects').innerHTML = cached.projects || '';
     document.getElementById('activityCommits').innerHTML  = cached.commitLog || '';
     applyActivityKpis(cached.kpis);
-    return;
   }
-  loadActivity();
+  loadActivity(!!cached);
 }
 
 function applyActivityKpis(k) {
@@ -1393,7 +1471,7 @@ function applyActivityKpis(k) {
 
 const ACTIVITY_WINDOW_DAYS = 30;
 
-async function loadActivity() {
+async function loadActivity(quiet = false) {
   if (!ME) return;
   const now = new Date();
   // Rolling window: last 30 days (today and the 29 days before it), inclusive
@@ -1402,8 +1480,10 @@ async function loadActivity() {
   const afterKey = localDateKey(afterParam);
   document.getElementById('activityMonthLabel').textContent =
     `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
-  document.getElementById('activityHeatmap').innerHTML  = '<div class="loading"><span class="spinner"></span>Loading events…</div>';
-  document.getElementById('activityProjects').innerHTML = '<div class="loading"><span class="spinner"></span>Loading…</div>';
+  if (!quiet) {
+    document.getElementById('activityHeatmap').innerHTML  = '<div class="loading"><span class="spinner"></span>Loading events…</div>';
+    document.getElementById('activityProjects').innerHTML = '<div class="loading"><span class="spinner"></span>Loading…</div>';
+  }
 
   try {
     const events = await reqAll(`/events?after=${afterKey}&per_page=100`);
